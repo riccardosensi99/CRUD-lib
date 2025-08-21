@@ -1,0 +1,27 @@
+DROP TABLE IF EXISTS "Profile" CASCADE;
+DROP TABLE IF EXISTS "User" CASCADE;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'Role') THEN
+    DROP TYPE "Role";
+  END IF;
+END$$;
+
+CREATE TYPE "Role" AS ENUM ('USER', 'ADMIN');
+
+CREATE TABLE "User" (
+  id SERIAL PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  "passwordHash" TEXT NOT NULL,
+  name TEXT,
+  role "Role" NOT NULL DEFAULT 'USER',
+  "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE "Profile" (
+  id SERIAL PRIMARY KEY,
+  "userId" INT NOT NULL UNIQUE REFERENCES "User"(id) ON DELETE CASCADE,
+  bio TEXT,
+  "avatarUrl" TEXT
+);
