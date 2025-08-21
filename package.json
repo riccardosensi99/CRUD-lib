@@ -1,17 +1,53 @@
 {
   "name": "my-crud-lib",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "description": "Libreria CRUD modulare (Auth/User/Profile) con Prisma + TS",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "prisma/schema.prisma"
+  ],
+  "engines": {
+    "node": ">=18.17"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "prisma": {
+    "schema": "prisma/schema.prisma"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "dev:db:up": "docker-compose up -d",
+    "dev:db:down": "docker-compose down -v",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "postinstall": "prisma generate",
+    "schema": "prisma/schema.prisma",
+    "db:schema": "docker exec -i mycrud_postgres psql -U app -d mycrud -v ON_ERROR_STOP=1 -f /dev/stdin < prisma/schema.sql",
+    "db:seed": "docker exec -i mycrud_postgres psql -U app -d mycrud -v ON_ERROR_STOP=1 -f /dev/stdin < prisma/seed.sql",
+    "db:init": "npm run db:schema && npm run db:seed"
+  },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^24.3.0",
+    "prisma": "^6.14.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.14.0",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.3.1",
+    "jsonwebtoken": "^9.0.2",
+    "zod": "^3.23.8"
+  },
+  "peerDependencies": {
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
   }
 }
