@@ -1,16 +1,28 @@
 {
   "name": "my-crud-lib",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Libreria CRUD modulare (Auth/User/Profile) con TS; Prisma opzionale via adapter",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" },
-    "./adapters/prisma": { "import": "./dist/adapters/prisma.js", "types": "./dist/adapters/prisma.d.ts" },
-    "./modules/user/user.router": { "import": "./dist/modules/user/user.router.js", "types": "./dist/modules/user/user.router.d.ts" },
-    "./modules/auth/auth.router": { "import": "./dist/modules/auth/auth.router.js", "types": "./dist/modules/auth/auth.router.d.ts" }
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./adapters/prisma": {
+      "import": "./dist/adapters/prisma.js",
+      "types": "./dist/adapters/prisma.d.ts"
+    },
+    "./modules/user/user.router": {
+      "import": "./dist/modules/user/user.router.js",
+      "types": "./dist/modules/user/user.router.d.ts"
+    },
+    "./modules/auth/auth.router": {
+      "import": "./dist/modules/auth/auth.router.js",
+      "types": "./dist/modules/auth/auth.router.d.ts"
+    }
   },
   "./adapter-prisma": {
     "import": "./dist/adapters/prisma.js",
