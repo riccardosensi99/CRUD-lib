@@ -1,154 +1,69 @@
-import { prisma } from '../../utils/prisma.js';
-import type { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import type {
-    AdminCreateUserInput,
-    AdminUpdateUserInput,
-    ListUsersQuery,
-    UpdateMeInput,
-} from './user.schemas.js';
+  AdminCreateUserInput,
+  AdminUpdateUserInput,
+  ListUsersQuery,
+  Paginated,
+  UpdateMeInput,
+  UserListItem
+} from './user.types.js';
+import type { UserRepo } from '../../core/ports/user.repo.js';
 
-export async function listUsers(q: ListUsersQuery) {
-    const { page, pageSize, role, search } = q;
+const allowedFields = ['createdAt', 'updatedAt', 'email', 'name'] as const;
 
-    const [rawField, rawDir] = (q.sort ?? 'createdAt:desc').split(':');
-    const allowedFields = ['createdAt', 'updatedAt', 'email', 'name'] as const;
-    const sortField = (allowedFields as readonly string[]).includes(rawField || '')
-        ? (rawField as (typeof allowedFields)[number])
-        : 'createdAt';
-    const sortDir: 'asc' | 'desc' = rawDir === 'asc' || rawDir === 'desc' ? rawDir : 'desc';
-
-    const where: Prisma.UserWhereInput = {};
-    if (role) where.role = role;
-    if (search && search.trim() !== '') {
-        const s = search.trim();
-        where.OR = [
-            { email: { contains: s, mode: 'insensitive' as const } },
-            { name: { contains: s, mode: 'insensitive' as const } },
-        ];
-    }
-
-    const orderBy: Prisma.UserOrderByWithRelationInput = { [sortField]: sortDir };
-
-    const [total, items] = await Promise.all([
-        prisma.user.count({ where }),
-        prisma.user.findMany({
-            where,
-            orderBy,
-            skip: (page - 1) * pageSize,
-            take: pageSize,
-            select: {
-                id: true,
-                email: true,
-                name: true,
-                role: true,
-                createdAt: true,
-                updatedAt: true,
-                profile: { select: { bio: true, avatarUrl: true } },
-            },
-        }),
-    ]);
-
-    return {
-        page,
-        pageSize,
-        total,
-        items,
-        totalPages: Math.ceil(total / pageSize),
-    };
+function parseSort(sort?: string): { sortField: typeof allowedFields[number]; sortDir: 'asc'|'desc' } {
+  const [rawField, rawDir] = (sort ?? 'createdAt:desc').split(':');
+  const sortField = (allowedFields as readonly string[]).includes(rawField || '')
+    ? (rawField as typeof allowedFields[number])
+    : 'createdAt';
+  const sortDir: 'asc' | 'desc' = rawDir === 'asc' || rawDir === 'desc' ? rawDir : 'desc';
+  return { sortField, sortDir };
 }
 
-export async function getUserById(id: number) {
-    return prisma.user.findUnique({
-        where: { id },
-        select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-            createdAt: true,
-            updatedAt: true,
-            profile: { select: { bio: true, avatarUrl: true } },
-        },
-    });
-}
+export function makeUserService(deps: { userRepo: UserRepo }) {
+  const { userRepo } = deps;
 
-export async function updateMe(userId: number, data: UpdateMeInput) {
-    return prisma.user.update({
-        where: { id: userId },
-        data: {
-            name: data.name ?? undefined,
-            profile: {
-                upsert: {
-                    create: { bio: data.bio ?? null, avatarUrl: data.avatarUrl ?? null },
-                    update: { bio: data.bio ?? null, avatarUrl: data.avatarUrl ?? null },
-                },
-            },
-        },
-        select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-            profile: { select: { bio: true, avatarUrl: true } },
-        },
-    });
-}
+  return {
+    async listUsers(q: ListUsersQuery): Promise<Paginated<UserListItem>> {
+      const { page, pageSize, role, search } = q;
+      const { sortField, sortDir } = parseSort(q.sort);
+      const [total, items] = await Promise.all([
+        userRepo.count({ role, search }),
+        userRepo.findMany({ page, pageSize, role, search, sortField, sortDir }),
+      ]);
+      return { page, pageSize, total, totalPages: Math.ceil(total / pageSize), items };
+    },
 
-export async function adminCreateUser(input: AdminCreateUserInput) {
-    const exists = await prisma.user.findUnique({ where: { email: input.email } });
-    if (exists) throw new Error('EMAIL_TAKEN');
+    getUserById(id: number | string) {
+      return userRepo.findById(id);
+    },
 
-    const passwordHash = await bcrypt.hash(input.password, Number(process.env.BCRYPT_SALT) || 10);
+    updateMe(userId: number | string, data: UpdateMeInput) {
+      return userRepo.updateMe(userId, data);
+    },
 
-    return prisma.user.create({
-        data: {
-            email: input.email,
-            passwordHash,
-            name: input.name ?? null,
-            role: input.role ?? 'USER',
-            profile: {
-                create: {
-                    bio: input.bio ?? null,
-                    avatarUrl: input.avatarUrl ?? null,
-                },
-            },
-        },
-        select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-            profile: { select: { bio: true, avatarUrl: true } },
-            createdAt: true,
-            updatedAt: true,
-        },
-    });
-}
+    async adminCreateUser(input: AdminCreateUserInput) {
+      const exists = await userRepo.findByEmail(input.email);
+      if (exists) throw new Error('EMAIL_TAKEN');
+      const rounds = Number(process.env.BCRYPT_SALT) || 10;
+      const passwordHash = await bcrypt.hash(input.password, rounds);
+      return userRepo.create({
+        email: input.email,
+        passwordHash,
+        name: input.name ?? null,
+        role: input.role ?? 'USER',
+        bio: input.bio ?? null,
+        avatarUrl: input.avatarUrl ?? null,
+      });
+    },
 
-export async function adminUpdateUser(id: number, input: AdminUpdateUserInput) {
-    return prisma.user.update({
-        where: { id },
-        data: {
-            name: input.name ?? undefined,
-            role: input.role ?? undefined,
-            profile: {
-                upsert: {
-                    create: { bio: input.bio ?? null, avatarUrl: input.avatarUrl ?? null },
-                    update: { bio: input.bio ?? null, avatarUrl: input.avatarUrl ?? null },
-                },
-            },
-        },
-        select: {
-            id: true, email: true, name: true, role: true,
-            profile: { select: { bio: true, avatarUrl: true } },
-            createdAt: true, updatedAt: true,
-        },
-    });
-}
+    adminUpdateUser(id: number | string, input: AdminUpdateUserInput) {
+      return userRepo.update(id, input);
+    },
 
-export async function adminDeleteUser(id: number) {
-    const user = await prisma.user.findUnique({ where: { id } });
-    await prisma.user.delete({ where: { id } });
-    return { ok: true };
+    async adminDeleteUser(id: number | string) {
+      await userRepo.delete(id);
+      return { ok: true as const };
+    },
+  };
 }

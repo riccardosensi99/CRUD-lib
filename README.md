@@ -196,6 +196,12 @@ The package exports the main public types:
 
 ---
 
+## Optional
+
+if you want to use the prisma adeapter use:
+
+npm i @prisma/client prisma
+npx prisma generate
 
 ## Contributing
 
