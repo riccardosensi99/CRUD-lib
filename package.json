@@ -6,6 +6,12 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "files": [
     "dist",
     "prisma/schema.prisma"
@@ -19,20 +25,24 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
+    "dev": "node --loader ts-node/esm --no-warnings=ExperimentalWarning src/dev.ts",
     "dev:db:up": "docker-compose up -d",
     "dev:db:down": "docker-compose down -v",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "schema": "prisma/schema.prisma",
+    "prepublishOnly": "npm run build",
     "db:schema": "docker exec -i mycrud_postgres psql -U app -d mycrud -v ON_ERROR_STOP=1 -f /dev/stdin < prisma/schema.sql",
     "db:seed": "docker exec -i mycrud_postgres psql -U app -d mycrud -v ON_ERROR_STOP=1 -f /dev/stdin < prisma/seed.sql",
-    "db:init": "npm run db:schema && npm run db:seed"
+    "db:init": "npm run db:schema && npm run db:seed",
+    "generate:secret": "node scripts/generateSecret.js"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.3.0",
     "prisma": "^6.14.0",
     "ts-node": "^10.9.2",
@@ -49,5 +59,8 @@
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "express": "^4.18.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
