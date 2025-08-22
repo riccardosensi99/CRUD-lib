@@ -1,6 +1,6 @@
 {
   "name": "my-crud-lib",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Libreria CRUD modulare (Auth/User/Profile) con TS; Prisma opzionale via adapter",
   "license": "MIT",
   "type": "module",
