@@ -1,5 +1,8 @@
 # my-crud-lib
 
+[![CI](https://github.com/riccardosensi99/CRUD-lib/actions/workflows/ci.yml/badge.svg)](https://github.com/riccardosensi99/CRUD-lib/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/my-crud-lib.svg)](https://www.npmjs.com/package/my-crud-lib)
+
 TypeScript-first auth and user/profile CRUD helpers for Node.js and Express.
 
 The package currently provides:

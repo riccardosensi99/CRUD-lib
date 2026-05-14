@@ -1,11 +1,33 @@
 {
   "name": "my-crud-lib",
   "version": "1.0.4",
-  "description": "Libreria CRUD modulare (Auth/User/Profile) con TS; Prisma opzionale via adapter",
+  "description": "TypeScript auth and user/profile CRUD helpers for Express with Prisma and custom repository adapters",
   "license": "MIT",
+  "author": "Riccardo Sensi",
   "type": "module",
+  "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "keywords": [
+    "auth",
+    "authentication",
+    "express",
+    "prisma",
+    "jwt",
+    "zod",
+    "typescript",
+    "crud",
+    "user-management",
+    "repository-pattern"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/riccardosensi99/CRUD-lib.git"
+  },
+  "bugs": {
+    "url": "https://github.com/riccardosensi99/CRUD-lib/issues"
+  },
+  "homepage": "https://github.com/riccardosensi99/CRUD-lib#readme",
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -40,6 +62,7 @@
     "dist",
     "examples",
     "README.md",
+    "RELEASE.md",
     "LICENSE",
     "prisma/schema.prisma"
   ],
@@ -52,7 +75,7 @@
   "scripts": {
     "build": "tsc",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "ci": "npm test && npm run smoke:exports && npm run smoke:auth-hardening && npm run smoke:auth-service && npm --cache /tmp/codex-npm-cache pack --dry-run",
+    "ci": "npm test && npm run smoke:exports && npm run smoke:auth-hardening && npm run smoke:auth-service && npm --cache .npm-cache pack --dry-run",
     "start": "node dist/index.js",
     "dev": "node --loader ts-node/esm --no-warnings=ExperimentalWarning src/dev.ts",
     "dev:db:up": "docker-compose up -d",
