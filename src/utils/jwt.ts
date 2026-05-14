@@ -5,6 +5,8 @@ export type JwtPayload = {
   sub: number | string;
   role: "USER" | "ADMIN";
   typ?: "refresh";
+  jti?: string;
+  fam?: string;
 };
 
 export function signAccessToken(payload: JwtPayload): string {

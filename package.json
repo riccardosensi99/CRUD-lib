@@ -1,6 +1,6 @@
 {
   "name": "my-crud-lib",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "TypeScript auth and user/profile CRUD helpers for Express with Prisma and custom repository adapters",
   "license": "MIT",
   "author": "Riccardo Sensi",
@@ -60,17 +60,17 @@
   },
   "files": [
     "dist",
+    "docs",
     "examples",
+    "CHANGELOG.md",
     "README.md",
     "RELEASE.md",
     "LICENSE",
-    "prisma/schema.prisma"
+    "prisma/schema.prisma",
+    "prisma.config.ts"
   ],
   "engines": {
     "node": ">=18.17"
-  },
-  "prisma": {
-    "schema": "prisma/schema.prisma"
   },
   "scripts": {
     "prebuild": "node scripts/prisma-generate.mjs",

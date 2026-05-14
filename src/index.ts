@@ -15,8 +15,34 @@ export { createUserRouter } from './modules/user/user.controller.js';
 export { createAuthRouter } from './modules/auth/auth.controller.js';
 export { DEFAULT_REGISTER_ROLE, resolveRegisterRole } from './modules/auth/auth.defaults.js';
 export { makeAuthService } from './modules/auth/auth.service.js';
-export { registerSchema, loginSchema } from './modules/auth/auth.schemas.js';
-export type { AuthResult, AuthServiceDeps, AuthTokens, AuthUser, AuthUserRepo } from './modules/auth/auth.types.js';
+export {
+  emailVerificationConfirmSchema,
+  emailVerificationRequestSchema,
+  loginSchema,
+  passwordResetConfirmSchema,
+  passwordResetRequestSchema,
+  registerSchema,
+} from './modules/auth/auth.schemas.js';
+export type {
+  AuthResult,
+  AuthServiceDeps,
+  AuthTokens,
+  AuthUser,
+  AuthUserRepo,
+  EmailVerificationConfirmInput,
+  EmailVerificationRequestInput,
+  EmailVerificationTokenRecord,
+  EmailVerificationTokenRepo,
+  OAuthAccount,
+  OAuthAccountRepo,
+  OAuthProviderProfile,
+  PasswordResetConfirmInput,
+  PasswordResetRequestInput,
+  PasswordResetTokenRecord,
+  PasswordResetTokenRepo,
+  RefreshTokenRecord,
+  RefreshTokenRepo,
+} from './modules/auth/auth.types.js';
 export {
   SortEnum,
   adminCreateUserSchema,
@@ -26,7 +52,13 @@ export {
 } from './modules/user/user.schemas.js';
 export { isAuth, type AuthRequest } from './middleware/isAuth.js';
 export { hasRole, isSelfOrAdmin } from './middleware/hasRole.js';
-export { makePrismaUserRepo } from './adapters/prisma.js';
+export {
+  makePrismaEmailVerificationTokenRepo,
+  makePrismaOAuthAccountRepo,
+  makePrismaPasswordResetTokenRepo,
+  makePrismaRefreshTokenRepo,
+  makePrismaUserRepo,
+} from './adapters/prisma.js';
 
 import type { UserRepo } from './core/ports/user.repo.js';
 import type { AuthServiceDeps } from './modules/auth/auth.types.js';

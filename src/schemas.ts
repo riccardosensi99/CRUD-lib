@@ -1,4 +1,11 @@
-export { loginSchema, registerSchema } from './modules/auth/auth.schemas.js';
+export {
+  emailVerificationConfirmSchema,
+  emailVerificationRequestSchema,
+  loginSchema,
+  passwordResetConfirmSchema,
+  passwordResetRequestSchema,
+  registerSchema,
+} from './modules/auth/auth.schemas.js';
 export {
   SortEnum,
   adminCreateUserSchema,

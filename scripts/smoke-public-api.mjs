@@ -13,10 +13,18 @@ assert.equal(typeof root.createServer, 'function');
 assert.equal(typeof root.mountDefaultRoutes, 'function');
 assert.equal(typeof auth.createAuthRouter, 'function');
 assert.equal(typeof auth.makeAuthService, 'function');
+assert.equal(typeof auth.passwordResetRequestSchema.parse, 'function');
+assert.equal(typeof auth.emailVerificationConfirmSchema.parse, 'function');
 assert.equal(typeof user.createUserRouter, 'function');
 assert.equal(typeof schemas.registerSchema.parse, 'function');
+assert.equal(typeof schemas.passwordResetConfirmSchema.parse, 'function');
 assert.equal(typeof middleware.isAuth, 'function');
 assert.equal(typeof prismaAdapter.makePrismaUserRepo, 'function');
+assert.equal(typeof prismaAdapter.makePrismaRefreshTokenRepo, 'function');
+assert.equal(typeof prismaAdapter.makePrismaPasswordResetTokenRepo, 'function');
+assert.equal(typeof prismaAdapter.makePrismaEmailVerificationTokenRepo, 'function');
+assert.equal(typeof prismaAdapter.makePrismaOAuthAccountRepo, 'function');
 assert.equal(typeof prismaAdapterCanonical.makePrismaUserRepo, 'function');
+assert.equal(typeof prismaAdapterCanonical.makePrismaRefreshTokenRepo, 'function');
 
 console.log('Public API smoke test passed');

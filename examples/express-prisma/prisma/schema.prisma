@@ -8,14 +8,19 @@ datasource db {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
-  passwordHash String
-  name         String?
-  role         Role     @default(USER)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  profile      Profile?
+  id                      Int                      @id @default(autoincrement())
+  email                   String                   @unique
+  passwordHash            String
+  name                    String?
+  role                    Role                     @default(USER)
+  emailVerifiedAt         DateTime?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  profile                 Profile?
+  refreshTokens           RefreshToken[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  oauthAccounts           OauthAccount[]
 }
 
 model Profile {
@@ -24,6 +29,62 @@ model Profile {
   bio       String?
   avatarUrl String?
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RefreshToken {
+  id                String    @id
+  userId            Int
+  tokenHash         String
+  familyId          String
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  replacedByTokenId String?
+  createdAt         DateTime  @default(now())
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+model PasswordResetToken {
+  id        String    @id
+  userId    Int
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        String    @id
+  userId    Int
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model OauthAccount {
+  id                Int      @id @default(autoincrement())
+  provider          String
+  providerAccountId String
+  userId            Int
+  email             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("OAuthAccount")
 }
 
 enum Role {
