@@ -5,6 +5,7 @@ export type UserListItem = {
   email: string;
   name: string | null;
   role: Role;
+  emailVerifiedAt?: Date | string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
   profile?: { bio: string | null; avatarUrl: string | null } | null;

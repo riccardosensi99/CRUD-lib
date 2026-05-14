@@ -16,4 +16,6 @@ export interface UserRepo {
   update(id: number | string, input: AdminUpdateUserInput): Promise<UserListItem>;
   delete(id: number | string): Promise<void>;
   updateMe(userId: number | string, input: { name?: string | null; bio?: string | null; avatarUrl?: string | null }): Promise<UserListItem>;
+  updatePassword?(id: number | string, passwordHash: string): Promise<UserListItem | void>;
+  markEmailVerified?(id: number | string, verifiedAt?: Date): Promise<UserListItem | void>;
 }

@@ -9,9 +9,14 @@ The package currently provides:
 
 - Express routers for auth and user CRUD.
 - JWT access and refresh token helpers.
+- Optional persistent refresh token rotation and revocation.
+- Optional password reset and email verification hooks.
+- Provider-agnostic OAuth account linking extension points.
 - Zod schemas for request validation.
 - A `UserRepo` port plus a Prisma adapter.
 - Convenience setup helpers for small Express APIs.
+
+For advanced auth flows, see [docs/auth-extensions.md](docs/auth-extensions.md). For v1 to v2 upgrades, see [docs/migration-v2.md](docs/migration-v2.md). Release history and breaking changes are tracked in [CHANGELOG.md](CHANGELOG.md).
 
 ## Installation
 
@@ -72,6 +77,11 @@ With the `/api` prefix, the mounted routes include:
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `POST /api/auth/refresh`
+- `POST /api/auth/logout`
+- `POST /api/auth/password-reset/request`
+- `POST /api/auth/password-reset/confirm`
+- `POST /api/auth/email-verification/request`
+- `POST /api/auth/email-verification/confirm`
 - `GET /api/auth/me`
 - `GET /api/users`
 - `GET /api/users/me`
@@ -206,7 +216,13 @@ export interface UserRepo {
 The Prisma adapter is available from both import paths:
 
 ```ts
-import { makePrismaUserRepo } from "my-crud-lib/adapter-prisma";
+import {
+  makePrismaEmailVerificationTokenRepo,
+  makePrismaOAuthAccountRepo,
+  makePrismaPasswordResetTokenRepo,
+  makePrismaRefreshTokenRepo,
+  makePrismaUserRepo,
+} from "my-crud-lib/adapter-prisma";
 // or
 import { makePrismaUserRepo } from "my-crud-lib/adapters/prisma";
 ```
@@ -219,10 +235,34 @@ import { createAuthRouter } from "my-crud-lib/auth";
 app.use("/auth", createAuthRouter({ userRepo }));
 ```
 
+Optional auth extensions use additional ports:
+
+```ts
+app.use(
+  "/auth",
+  createAuthRouter({
+    userRepo,
+    refreshTokenRepo,
+    passwordResetTokenRepo,
+    emailVerificationTokenRepo,
+    oauthAccountRepo,
+    async sendPasswordReset({ user, token }) {
+      await emailProvider.sendPasswordReset(user.email, token);
+    },
+    async sendEmailVerification({ user, token }) {
+      await emailProvider.sendVerification(user.email, token);
+    },
+  })
+);
+```
+
+These dependencies are optional. Without them, the existing stateless refresh-token flow remains available and password reset, email verification, and OAuth methods report that they are not configured.
+
 ## Build Checks
 
 ```bash
 npm run build
+npm test
 npm run smoke:exports
 npm run smoke:auth-hardening
 npm run smoke:auth-service
