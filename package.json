@@ -73,6 +73,7 @@
     "schema": "prisma/schema.prisma"
   },
   "scripts": {
+    "prebuild": "node scripts/prisma-generate.mjs",
     "build": "tsc",
     "test": "npm run build && node --test tests/*.test.mjs",
     "ci": "npm test && npm run smoke:exports && npm run smoke:auth-hardening && npm run smoke:auth-service && npm --cache .npm-cache pack --dry-run",
