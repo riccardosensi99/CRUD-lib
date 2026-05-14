@@ -48,7 +48,12 @@ const prisma = new PrismaClient();
 const app = createServer();
 
 const lib = createLibrary(
-  { routesPrefix: "/api" },
+  {
+    routesPrefix: "/api",
+    auth: {
+      passwordHashRounds: 10,
+    },
+  },
   { userRepo: makePrismaUserRepo(prisma) }
 );
 
@@ -88,7 +93,7 @@ import {
   hasRole,
 } from "my-crud-lib";
 
-import { createAuthRouter, registerSchema, loginSchema } from "my-crud-lib/auth";
+import { createAuthRouter, makeAuthService, registerSchema, loginSchema } from "my-crud-lib/auth";
 import { createUserRouter, type UserRepo } from "my-crud-lib/user";
 import { registerSchema, listUsersQuerySchema } from "my-crud-lib/schemas";
 import { isAuth, hasRole } from "my-crud-lib/middleware";
@@ -138,20 +143,29 @@ import { makePrismaUserRepo } from "my-crud-lib/adapter-prisma";
 import { makePrismaUserRepo } from "my-crud-lib/adapters/prisma";
 ```
 
+Auth also receives the same repository dependency:
+
+```ts
+import { createAuthRouter } from "my-crud-lib/auth";
+
+app.use("/auth", createAuthRouter({ userRepo }));
+```
+
 ## Build Checks
 
 ```bash
 npm run build
 npm run smoke:exports
 npm run smoke:auth-hardening
+npm run smoke:auth-service
 ```
 
 `smoke:exports` builds the package and imports the documented public paths from `dist`.
 `smoke:auth-hardening` checks auth safety defaults and JWT secret validation.
+`smoke:auth-service` verifies register/login/refresh/me with an in-memory repo.
 
 ## Current Limitations
 
-- Auth register/login/refresh currently use the bundled Prisma-backed auth implementation. Full auth storage injection is tracked as a separate improvement.
 - Lifecycle hooks and schema factories are not part of the current public API.
 - The Prisma schema is included as a starter schema; consumer apps should own their migrations.
 
