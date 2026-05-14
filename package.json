@@ -50,6 +50,8 @@
   },
   "scripts": {
     "build": "tsc",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "ci": "npm test && npm run smoke:exports && npm run smoke:auth-hardening && npm run smoke:auth-service && npm --cache /tmp/codex-npm-cache pack --dry-run",
     "start": "node dist/index.js",
     "dev": "node --loader ts-node/esm --no-warnings=ExperimentalWarning src/dev.ts",
     "dev:db:up": "docker-compose up -d",
