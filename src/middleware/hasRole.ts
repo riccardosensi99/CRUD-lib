@@ -15,8 +15,7 @@ export function isSelfOrAdmin() {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     const uid = req.user?.id;
     const role = req.user?.role;
-    const paramId = Number(req.params.id);
-    if (role === 'ADMIN' || uid === paramId) return next();
+    if (role === 'ADMIN' || String(uid) === req.params.id) return next();
     return res.status(403).json({ error: 'Forbidden' });
   };
 }

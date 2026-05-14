@@ -9,7 +9,7 @@ const app = createServer();
 const prisma = new PrismaClient();
 const userRepo = makePrismaUserRepo(prisma);
 
-app.use('/auth', createAuthRouter());
+app.use('/auth', createAuthRouter({ userRepo }));
 app.use('/users', createUserRouter({ userRepo }));
 
 const PORT = Number(process.env.PORT) || 3000;

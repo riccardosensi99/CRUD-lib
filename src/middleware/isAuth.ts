@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt.js';
 
-export type AuthRequest = Request & { user?: { id: number; role: 'USER' | 'ADMIN' } };
+export type AuthRequest = Request & { user?: { id: number | string; role: 'USER' | 'ADMIN' } };
 
 export function isAuth(req: AuthRequest, res: Response, next: NextFunction) {
   const auth = req.headers.authorization;
@@ -10,7 +10,7 @@ export function isAuth(req: AuthRequest, res: Response, next: NextFunction) {
   }
   const token = auth.substring('Bearer '.length);
   try {
-    const payload = verifyToken<{ sub: number; role: 'USER' | 'ADMIN' }>(token);
+    const payload = verifyToken<{ sub: number | string; role: 'USER' | 'ADMIN' }>(token);
     req.user = { id: payload.sub, role: payload.role };
     return next();
   } catch {

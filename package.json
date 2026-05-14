@@ -60,6 +60,7 @@
     "prepublishOnly": "npm run build",
     "smoke:exports": "npm run build && node scripts/smoke-public-api.mjs",
     "smoke:auth-hardening": "npm run build && node scripts/smoke-auth-hardening.mjs",
+    "smoke:auth-service": "npm run build && node scripts/smoke-auth-service.mjs",
     "db:schema": "docker exec -i mycrud_postgres psql -U app -d mycrud -v ON_ERROR_STOP=1 -f /dev/stdin < prisma/schema.sql",
     "db:seed": "docker exec -i mycrud_postgres psql -U app -d mycrud -v ON_ERROR_STOP=1 -f /dev/stdin < prisma/seed.sql",
     "db:init": "npm run db:schema && npm run db:seed",

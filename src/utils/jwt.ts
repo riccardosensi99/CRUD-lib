@@ -2,7 +2,7 @@ import jwt, { type SignOptions } from "jsonwebtoken";
 import { getJwtSecret, JWT_ACCESS_EXPIRES_IN, JWT_REFRESH_EXPIRES_IN } from "../config/env.js";
 
 export type JwtPayload = {
-  sub: number;
+  sub: number | string;
   role: "USER" | "ADMIN";
   typ?: "refresh";
 };

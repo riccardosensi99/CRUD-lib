@@ -14,7 +14,9 @@ export type {
 export { createUserRouter } from './modules/user/user.controller.js';
 export { createAuthRouter } from './modules/auth/auth.controller.js';
 export { DEFAULT_REGISTER_ROLE, resolveRegisterRole } from './modules/auth/auth.defaults.js';
+export { makeAuthService } from './modules/auth/auth.service.js';
 export { registerSchema, loginSchema } from './modules/auth/auth.schemas.js';
+export type { AuthResult, AuthServiceDeps, AuthTokens, AuthUser, AuthUserRepo } from './modules/auth/auth.types.js';
 export {
   SortEnum,
   adminCreateUserSchema,
@@ -27,11 +29,13 @@ export { hasRole, isSelfOrAdmin } from './middleware/hasRole.js';
 export { makePrismaUserRepo } from './adapters/prisma.js';
 
 import type { UserRepo } from './core/ports/user.repo.js';
+import type { AuthServiceDeps } from './modules/auth/auth.types.js';
 import { createAuthRouter } from './modules/auth/auth.controller.js';
 import { createUserRouter } from './modules/user/user.controller.js';
 
 export type LibraryConfig = {
   routesPrefix?: string;
+  auth?: Omit<AuthServiceDeps, 'userRepo'>;
 };
 
 export type LibraryDeps = {
@@ -57,7 +61,7 @@ export function createLibrary(config: LibraryConfig, deps: LibraryDeps) {
   const router = Router();
   const prefix = normalizePrefix(config.routesPrefix);
 
-  router.use(`${prefix}/auth`, createAuthRouter());
+  router.use(`${prefix}/auth`, createAuthRouter({ userRepo: deps.userRepo, ...config.auth }));
   router.use(`${prefix}/users`, createUserRouter({ userRepo: deps.userRepo }));
 
   return { router };

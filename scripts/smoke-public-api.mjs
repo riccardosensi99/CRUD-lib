@@ -12,6 +12,7 @@ assert.equal(typeof root.createLibrary, 'function');
 assert.equal(typeof root.createServer, 'function');
 assert.equal(typeof root.mountDefaultRoutes, 'function');
 assert.equal(typeof auth.createAuthRouter, 'function');
+assert.equal(typeof auth.makeAuthService, 'function');
 assert.equal(typeof user.createUserRouter, 'function');
 assert.equal(typeof schemas.registerSchema.parse, 'function');
 assert.equal(typeof middleware.isAuth, 'function');
