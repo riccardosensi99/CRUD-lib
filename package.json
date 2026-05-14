@@ -1,6 +1,6 @@
 {
   "name": "my-crud-lib",
-  "version": "1.0.4",
+  "version": "2.0.0",
   "description": "TypeScript auth and user/profile CRUD helpers for Express with Prisma and custom repository adapters",
   "license": "MIT",
   "author": "Riccardo Sensi",
