@@ -13,6 +13,7 @@ export type {
 } from './modules/user/user.types.js';
 export { createUserRouter } from './modules/user/user.controller.js';
 export { createAuthRouter } from './modules/auth/auth.controller.js';
+export { DEFAULT_REGISTER_ROLE, resolveRegisterRole } from './modules/auth/auth.defaults.js';
 export { registerSchema, loginSchema } from './modules/auth/auth.schemas.js';
 export {
   SortEnum,

@@ -143,9 +143,11 @@ import { makePrismaUserRepo } from "my-crud-lib/adapters/prisma";
 ```bash
 npm run build
 npm run smoke:exports
+npm run smoke:auth-hardening
 ```
 
 `smoke:exports` builds the package and imports the documented public paths from `dist`.
+`smoke:auth-hardening` checks auth safety defaults and JWT secret validation.
 
 ## Current Limitations
 
@@ -159,7 +161,8 @@ npm run smoke:exports
 - Keep access tokens short-lived.
 - Add rate limiting around auth endpoints in production.
 - Use HTTPS in production.
-- Review role defaults before exposing admin routes.
+- Self-registration creates `USER` accounts by default.
+- Create `ADMIN` accounts intentionally through your own seed/admin workflow.
 
 ## License
 

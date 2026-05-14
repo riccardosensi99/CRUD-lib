@@ -2,6 +2,7 @@ import { prisma } from '../../utils/prisma.js';
 import bcrypt from 'bcryptjs';
 import { signAccessToken, signRefreshToken } from '../../utils/jwt.js';
 import type { RegisterInput } from './auth.schemas.js';
+import { resolveRegisterRole } from './auth.defaults.js';
 
 export async function registerUser(params: RegisterInput) {
   const exists = await prisma.user.findUnique({ where: { email: params.email } });
@@ -9,12 +10,13 @@ export async function registerUser(params: RegisterInput) {
 
   const passwordHash = await bcrypt.hash(params.password, Number(process.env.BCRYPT_SALT) || 10);
 
+  const role = resolveRegisterRole();
   const user = await prisma.user.create({
     data: {
       email: params.email,
       passwordHash,
       name: params.name ?? null,
-      role: 'ADMIN',
+      role,
       profile: { create: {} },
     },
     select: { id: true, email: true, name: true, role: true },
