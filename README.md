@@ -80,6 +80,71 @@ With the `/api` prefix, the mounted routes include:
 
 Admin user routes require a bearer token with role `ADMIN`.
 
+## Examples
+
+- `examples/express-prisma` is a runnable Express + Prisma app.
+- `examples/custom-repo` shows the `UserRepo` shape with an in-memory adapter.
+
+Run the Prisma example:
+
+```bash
+cd examples/express-prisma
+npm install
+cp .env.example .env
+npx prisma generate
+npx prisma migrate dev --name init
+npm run dev
+```
+
+## Response Examples
+
+Register:
+
+```http
+POST /api/auth/register
+Content-Type: application/json
+
+{
+  "email": "reader@example.com",
+  "password": "password123",
+  "name": "Reader"
+}
+```
+
+Response:
+
+```json
+{
+  "user": {
+    "id": 1,
+    "email": "reader@example.com",
+    "name": "Reader",
+    "role": "USER"
+  },
+  "accessToken": "eyJ...",
+  "refreshToken": "eyJ..."
+}
+```
+
+Login:
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "email": "reader@example.com",
+  "password": "password123"
+}
+```
+
+Protected request:
+
+```http
+GET /api/auth/me
+Authorization: Bearer <accessToken>
+```
+
 ## Public Imports
 
 ```ts
@@ -168,6 +233,24 @@ npm run smoke:auth-service
 
 - Lifecycle hooks and schema factories are not part of the current public API.
 - The Prisma schema is included as a starter schema; consumer apps should own their migrations.
+
+## Troubleshooting
+
+`Cannot find module '@prisma/client'`
+
+Install Prisma dependencies in your app and run `npx prisma generate`.
+
+`JWT_SECRET is required before signing or verifying tokens`
+
+Set `JWT_SECRET` before mounting or calling auth routes. Use a long random value.
+
+`Invalid or expired token`
+
+Send the access token in the `Authorization` header as `Bearer <accessToken>`. Use `/auth/refresh` with a refresh token to get a new pair.
+
+ESM import errors
+
+Use Node.js `>=18.17` and import from the documented package paths, for example `my-crud-lib`, `my-crud-lib/auth`, or `my-crud-lib/adapter-prisma`.
 
 ## Security Notes
 

@@ -38,6 +38,7 @@
   },
   "files": [
     "dist",
+    "examples",
     "README.md",
     "LICENSE",
     "prisma/schema.prisma"
