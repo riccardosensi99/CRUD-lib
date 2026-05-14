@@ -1,10 +1,49 @@
-import express, { type Express } from 'express';
+import express, { Router, type Express } from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 export type { UserRepo } from './core/ports/user.repo.js';
+export type {
+  AdminCreateUserInput,
+  AdminUpdateUserInput,
+  ListUsersQuery,
+  Paginated,
+  Role,
+  UpdateMeInput,
+  UserListItem,
+} from './modules/user/user.types.js';
 export { createUserRouter } from './modules/user/user.controller.js';
 export { createAuthRouter } from './modules/auth/auth.controller.js';
+export { registerSchema, loginSchema } from './modules/auth/auth.schemas.js';
+export {
+  SortEnum,
+  adminCreateUserSchema,
+  adminUpdateUserSchema,
+  listUsersQuerySchema,
+  updateMeSchema,
+} from './modules/user/user.schemas.js';
+export { isAuth, type AuthRequest } from './middleware/isAuth.js';
+export { hasRole, isSelfOrAdmin } from './middleware/hasRole.js';
 export { makePrismaUserRepo } from './adapters/prisma.js';
+
+import type { UserRepo } from './core/ports/user.repo.js';
+import { createAuthRouter } from './modules/auth/auth.controller.js';
+import { createUserRouter } from './modules/user/user.controller.js';
+
+export type LibraryConfig = {
+  routesPrefix?: string;
+};
+
+export type LibraryDeps = {
+  userRepo: UserRepo;
+};
+
+function normalizePrefix(prefix?: string): string {
+  if (!prefix) return '';
+  const trimmed = prefix.trim();
+  if (!trimmed || trimmed === '/') return '';
+  const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return withLeadingSlash.endsWith('/') ? withLeadingSlash.slice(0, -1) : withLeadingSlash;
+}
 
 export function createServer(): Express {
   const app = express();
@@ -13,22 +52,17 @@ export function createServer(): Express {
   return app;
 }
 
+export function createLibrary(config: LibraryConfig, deps: LibraryDeps) {
+  const router = Router();
+  const prefix = normalizePrefix(config.routesPrefix);
 
-export function mountDefaultRoutes(app: Express) {
-  const { createAuthRouter } = require('./modules/auth/auth.controller.js');
-  const { createUserRouter } = require('./modules/user/user.controller.js');
-  app.use('/auth', createAuthRouter());
-  app.use('/users', createUserRouter());
+  router.use(`${prefix}/auth`, createAuthRouter());
+  router.use(`${prefix}/users`, createUserRouter({ userRepo: deps.userRepo }));
+
+  return { router };
 }
 
-function requireUserRouter(deps: { userRepo: import('./core/ports/user.repo.js').UserRepo }) {
-  // @ts-ignore: compiled JS avrà il file corretto
-  const { createUserRouter } = require('./modules/user/user.router.js');
-  return createUserRouter({ userRepo: deps.userRepo });
-}
-
-function requireAuthRouter(_deps: unknown) {
-  // @ts-ignore
-  const { createAuthRouter } = require('./modules/auth/auth.router.js');
-  return createAuthRouter(/* es: { userRepo: deps.userRepo, jwt: {...} } */);
+export function mountDefaultRoutes(app: Express, deps: LibraryDeps, config: LibraryConfig = {}) {
+  const { router } = createLibrary(config, deps);
+  app.use(router);
 }

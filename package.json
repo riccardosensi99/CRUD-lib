@@ -11,22 +11,30 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
+    "./auth": {
+      "import": "./dist/auth.js",
+      "types": "./dist/auth.d.ts"
+    },
+    "./user": {
+      "import": "./dist/user.js",
+      "types": "./dist/user.d.ts"
+    },
+    "./schemas": {
+      "import": "./dist/schemas.js",
+      "types": "./dist/schemas.d.ts"
+    },
+    "./middleware": {
+      "import": "./dist/middleware.js",
+      "types": "./dist/middleware.d.ts"
+    },
+    "./adapter-prisma": {
+      "import": "./dist/adapter-prisma.js",
+      "types": "./dist/adapter-prisma.d.ts"
+    },
     "./adapters/prisma": {
       "import": "./dist/adapters/prisma.js",
       "types": "./dist/adapters/prisma.d.ts"
-    },
-    "./modules/user/user.router": {
-      "import": "./dist/modules/user/user.router.js",
-      "types": "./dist/modules/user/user.router.d.ts"
-    },
-    "./modules/auth/auth.router": {
-      "import": "./dist/modules/auth/auth.router.js",
-      "types": "./dist/modules/auth/auth.router.d.ts"
     }
-  },
-  "./adapter-prisma": {
-    "import": "./dist/adapters/prisma.js",
-    "types": "./dist/adapters/prisma.d.ts"
   },
   "files": [
     "dist",
@@ -50,6 +58,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prepublishOnly": "npm run build",
+    "smoke:exports": "npm run build && node scripts/smoke-public-api.mjs",
     "db:schema": "docker exec -i mycrud_postgres psql -U app -d mycrud -v ON_ERROR_STOP=1 -f /dev/stdin < prisma/schema.sql",
     "db:seed": "docker exec -i mycrud_postgres psql -U app -d mycrud -v ON_ERROR_STOP=1 -f /dev/stdin < prisma/seed.sql",
     "db:init": "npm run db:schema && npm run db:seed",

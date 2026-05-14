@@ -1,214 +1,166 @@
 # my-crud-lib
 
-A modular, TypeScript-first **Auth + User/Profile CRUD** library for Node.js, designed to be **framework-light**, **DB-agnostic** (via adapters), and **highly extensible** (schemas + hooks). Ship a secure `/auth/register`, `/auth/login`, and `/me` in minutes—then customize without forking the core.
+TypeScript-first auth and user/profile CRUD helpers for Node.js and Express.
 
-> Works great with Express and Prisma out of the box, but you can plug in your own repo adapter.
+The package currently provides:
 
----
-
-## Features
-
-- ✅ Ready-made routes: `POST /auth/register`, `POST /auth/login`, `GET /me`
-- 🔐 JWT-based auth with pluggable lifecycle hooks (before/after create, before issuing JWT, etc.)
-- 🧩 Extensible validation via **Zod**: merge your own fields into the base schemas
-- 🗄️ Repository interfaces (DB-agnostic) + optional Prisma adapter
-- 🧰 Cleanly separated core logic & web router
-- 🧪 TypeScript types exported for DX
-
----
+- Express routers for auth and user CRUD.
+- JWT access and refresh token helpers.
+- Zod schemas for request validation.
+- A `UserRepo` port plus a Prisma adapter.
+- Convenience setup helpers for small Express APIs.
 
 ## Installation
 
 ```bash
-npm i my-crud-lib zod jsonwebtoken bcryptjs
-# If using Prisma adapter in your app:
-npm i @prisma/client
+npm i my-crud-lib express cors body-parser
 ```
 
-> Node.js `>= 18.17` is required.
+If you use the bundled Prisma adapter:
 
----
+```bash
+npm i @prisma/client prisma
+npx prisma generate
+```
 
-## Quickstart (Express)
+Node.js `>=18.17` is required.
+
+## Environment
+
+```bash
+DATABASE_URL="postgresql://user:password@localhost:5432/app"
+JWT_SECRET="replace-with-a-long-random-secret"
+JWT_ACCESS_EXPIRES_IN="15m"
+JWT_REFRESH_EXPIRES_IN="7d"
+BCRYPT_SALT="10"
+```
+
+`JWT_ACCESS_EXPIRES_IN` and `JWT_REFRESH_EXPIRES_IN` have defaults. `JWT_SECRET` and `DATABASE_URL` must be set before using the default auth and Prisma paths.
+
+## Quickstart With Express And Prisma
 
 ```ts
-import express from "express";
-import { json } from "body-parser";
-import { createLibrary } from "my-crud-lib";
-// Optional: Prisma adapter (provided in your app)
 import { PrismaClient } from "@prisma/client";
-import { makePrismaUserRepo } from "my-crud-lib/adapter-prisma"; // if you expose this path
+import { createLibrary, createServer } from "my-crud-lib";
+import { makePrismaUserRepo } from "my-crud-lib/adapter-prisma";
 
 const prisma = new PrismaClient();
-
-const app = express();
-app.use(json());
+const app = createServer();
 
 const lib = createLibrary(
-  {
-    auth: {
-      jwtSecret: process.env.JWT_SECRET!, // e.g. "supersecret"
-      jwtExpiresIn: "7d",
-      passwordHashRounds: 10,
-    },
-    routesPrefix: "/api", // optional
-  },
+  { routesPrefix: "/api" },
   { userRepo: makePrismaUserRepo(prisma) }
 );
 
 app.use(lib.router);
 
-app.listen(3000, () => console.log("API running on http://localhost:3000"));
-```
-
-### Available Routes
-
-- `POST /auth/register` → create user (email + password + optional name)
-- `POST /auth/login` → returns `{ accessToken }`
-- `GET /me` → authenticated endpoint, returns the current user
-
-> Protect `/me` with the `isAuth` middleware already wired inside the library router.
-
----
-
-## Configuration
-
-```ts
-type AuthConfig = {
-  jwtSecret: string;
-  jwtExpiresIn: string; // e.g. "7d"
-  passwordHashRounds: number; // e.g. 10
-};
-
-type LibraryConfig = {
-  auth: AuthConfig;
-  routesPrefix?: string; // e.g. "/api"
-};
-```
-
-Create the library:
-
-```ts
-const lib = createLibrary(config, { userRepo });
-```
-
----
-
-## Extending Schemas (Zod)
-
-The library exports base Zod schemas and a factory to merge your custom fields.
-
-```ts
-// consumer app
-import { z } from "zod";
-import { makeCreateUserSchema } from "my-crud-lib/schemas";
-
-const ExtraUserFields = z.object({
-  companyVat: z.string().min(5),
-  marketingOptIn: z.boolean().default(false),
-});
-
-export const CreateUserSchema = makeCreateUserSchema(ExtraUserFields);
-
-// Later in your route (if you override the built-in):
-const data = CreateUserSchema.parse(req.body);
-```
-
-**Tip:** The default Prisma schema (if you use it) exposes `profile.extra: Json?` so you can store arbitrary fields without altering the core tables.
-
----
-
-## Hooks (Lifecycle)
-
-Use hooks to change data or enrich tokens without forking.
-
-```ts
-import { plugins } from "my-crud-lib";
-
-plugins.use({
-  beforeCreateUser: async (data, ctx) => {
-    if (data.companyVat) data.companyVat = data.companyVat.toUpperCase();
-    return data;
-  },
-  afterCreateUser: async (user, ctx) => {
-    // e.g., send welcome email or audit log
-  },
-  beforeIssueJwt: (payload, ctx) => {
-    return { ...payload, tenantId: "acme-123" };
-  },
+app.listen(3000, () => {
+  console.log("API running on http://localhost:3000");
 });
 ```
 
-**Available hooks**
-- `beforeCreateUser(data, ctx)`
-- `afterCreateUser(user, ctx)`
-- `beforeUpdateUser(data, ctx)`
-- `beforeIssueJwt(payload, ctx)`
+With the `/api` prefix, the mounted routes include:
 
-`ctx` includes the request and useful dependencies (e.g., repos).
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `GET /api/auth/me`
+- `GET /api/users`
+- `GET /api/users/me`
+- `PUT /api/users/me`
+- `POST /api/users`
+- `GET /api/users/:id`
+- `PUT /api/users/:id`
+- `DELETE /api/users/:id`
 
----
+Admin user routes require a bearer token with role `ADMIN`.
 
-## Repository Adapters (DB-agnostic)
+## Public Imports
 
-Core interface:
+```ts
+import {
+  createLibrary,
+  createServer,
+  mountDefaultRoutes,
+  createAuthRouter,
+  createUserRouter,
+  isAuth,
+  hasRole,
+} from "my-crud-lib";
+
+import { createAuthRouter, registerSchema, loginSchema } from "my-crud-lib/auth";
+import { createUserRouter, type UserRepo } from "my-crud-lib/user";
+import { registerSchema, listUsersQuerySchema } from "my-crud-lib/schemas";
+import { isAuth, hasRole } from "my-crud-lib/middleware";
+import { makePrismaUserRepo } from "my-crud-lib/adapter-prisma";
+import { makePrismaUserRepo as makePrismaUserRepoCanonical } from "my-crud-lib/adapters/prisma";
+```
+
+## Repository Adapter
+
+User CRUD is driven by the `UserRepo` interface:
 
 ```ts
 export interface UserRepo {
-  create(data: any): Promise<any>;
-  update(id: string, data: any): Promise<any>;
-  findById(id: string): Promise<any | null>;
-  findByEmail(email: string): Promise<any | null>;
+  count(where: { role?: string; search?: string }): Promise<number>;
+  findMany(params: {
+    page: number;
+    pageSize: number;
+    role?: string;
+    search?: string;
+    sortField: "createdAt" | "updatedAt" | "email" | "name";
+    sortDir: "asc" | "desc";
+  }): Promise<UserListItem[]>;
+  findById(id: number | string): Promise<UserListItem | null>;
+  findByEmail(email: string): Promise<(UserListItem & { passwordHash?: string }) | null>;
+  create(input: {
+    email: string;
+    passwordHash: string;
+    name?: string | null;
+    role?: string;
+    bio?: string | null;
+    avatarUrl?: string | null;
+  }): Promise<UserListItem>;
+  update(id: number | string, input: AdminUpdateUserInput): Promise<UserListItem>;
+  delete(id: number | string): Promise<void>;
+  updateMe(
+    userId: number | string,
+    input: { name?: string | null; bio?: string | null; avatarUrl?: string | null }
+  ): Promise<UserListItem>;
 }
 ```
 
-Example Prisma adapter (in your app or provided by the lib):
+The Prisma adapter is available from both import paths:
 
 ```ts
-export function makePrismaUserRepo(prisma: any): UserRepo {
-  return {
-    create: (data) => prisma.user.create({ data }),
-    update: (id, data) => prisma.user.update({ where: { id }, data }),
-    findById: (id) => prisma.user.findUnique({ where: { id } }),
-    findByEmail: (email) => prisma.user.findUnique({ where: { email } }),
-  };
-}
+import { makePrismaUserRepo } from "my-crud-lib/adapter-prisma";
+// or
+import { makePrismaUserRepo } from "my-crud-lib/adapters/prisma";
 ```
 
----
+## Build Checks
 
-## Types
+```bash
+npm run build
+npm run smoke:exports
+```
 
-The package exports the main public types:
+`smoke:exports` builds the package and imports the documented public paths from `dist`.
 
-- `LibraryConfig`, `AuthConfig`
-- `UserRepo`
-- schema types (e.g., `CreateUserBase`)
+## Current Limitations
 
----
+- Auth register/login/refresh currently use the bundled Prisma-backed auth implementation. Full auth storage injection is tracked as a separate improvement.
+- Lifecycle hooks and schema factories are not part of the current public API.
+- The Prisma schema is included as a starter schema; consumer apps should own their migrations.
 
 ## Security Notes
 
-- Keep `JWT_SECRET` secure; rotate if compromised.
-- Consider adding rate limiting in your app (e.g., `express-rate-limit`).
-- Store password hashes using `bcryptjs` with adequate rounds (default shown: `10`).
+- Use a long random `JWT_SECRET` and rotate it if compromised.
+- Keep access tokens short-lived.
+- Add rate limiting around auth endpoints in production.
 - Use HTTPS in production.
-
----
-
-## Optional
-
-if you want to use the prisma adeapter use:
-
-npm i @prisma/client prisma
-npx prisma generate
-
-## Contributing
-
-PRs and issues are welcome! Please follow conventional commits or include a clear description. For releases, we recommend Changesets or semantic-release.
-
----
+- Review role defaults before exposing admin routes.
 
 ## License
 
-MIT © Riccardo
+MIT
