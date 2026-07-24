@@ -402,6 +402,21 @@ The caller sends the key back via `X-API-Key: <key>` or `Authorization: ApiKey <
 
 To require either a user token or a service API key on the same route, chain your own small middleware that tries `isAuth` and falls back to `isApiKey`.
 
+## Asymmetric JWTs (RS256/JWKS)
+
+By default tokens are signed with `JWT_SECRET` (HS256), which every service that verifies tokens must also hold. For a microservices setup, sign with a private key in the auth service and let other services verify with the public key alone, via a standard JWKS endpoint:
+
+```bash
+JWT_ALG="RS256"
+JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+JWT_KEY_ID="2026-01"   # optional, defaults to "default"; bump when rotating keys
+```
+
+With `JWT_ALG=RS256`, `createLibrary`/`mountDefaultRoutes` automatically mount `GET /.well-known/jwks.json` (unprefixed, per convention) publishing the public key as a JWK. Other services can fetch it and verify tokens with any standard JWT/JWKS library — no shared secret required. `JWT_SECRET` is not needed in this mode.
+
+`JWT_PRIVATE_KEY`/`JWT_PUBLIC_KEY` accept PEM content directly, or with literal `\n` sequences (common when stored as a single-line CI/CD secret).
+
 ## Build Checks
 
 ```bash
