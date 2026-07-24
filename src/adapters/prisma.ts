@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { UserRepo } from '../core/ports/user.repo.js';
+import type { ApiKeyRepo } from '../core/ports/apiKey.repo.js';
 import type {
   EmailVerificationTokenRepo,
   OAuthAccountRepo,
@@ -295,6 +296,34 @@ export function makePrismaOAuthAccountRepo(prisma: PrismaClient): OAuthAccountRe
           userId: input.userId as any,
           email: input.email ?? null,
         },
+      });
+    },
+  };
+}
+
+/** `ApiKeyRepo` implementation; pass it to `isApiKey` to authenticate machine-to-machine requests. */
+export function makePrismaApiKeyRepo(prisma: PrismaClient): ApiKeyRepo {
+  return {
+    findById(id) {
+      return (prisma as any).apiKey.findUnique({ where: { id } });
+    },
+
+    create(input) {
+      return (prisma as any).apiKey.create({
+        data: {
+          id: input.id,
+          name: input.name ?? null,
+          keyHash: input.keyHash,
+          scopes: input.scopes ?? [],
+          tenantId: input.tenantId != null ? String(input.tenantId) : null,
+        },
+      });
+    },
+
+    async revoke(id, input = {}) {
+      await (prisma as any).apiKey.update({
+        where: { id },
+        data: { revokedAt: dateOrNow(input.revokedAt) },
       });
     },
   };

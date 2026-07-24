@@ -382,6 +382,26 @@ Behavior:
 
 Single-tenant apps are unaffected: omit `tenantId` everywhere and behavior is identical to before.
 
+## API Keys (Machine-to-Machine Auth)
+
+For requests between internal services (workers, schedulers, other microservices) that don't have a user behind them:
+
+```ts
+import { issueApiKey, isApiKey } from "my-crud-lib";
+import { makeMemoryApiKeyRepo } from "my-crud-lib/adapters/memory"; // or makePrismaApiKeyRepo
+
+const apiKeyRepo = makeMemoryApiKeyRepo();
+
+// generate once, e.g. from an admin script; store the returned key securely — it is never retrievable again
+const { key } = await issueApiKey(apiKeyRepo, { name: "billing-service", scopes: ["users:read"] });
+
+app.get("/internal/users/:id", isApiKey(apiKeyRepo, { requiredScopes: ["users:read"] }), handler);
+```
+
+The caller sends the key back via `X-API-Key: <key>` or `Authorization: ApiKey <key>`. Only a salted hash of the key is ever persisted (via `ApiKeyRepo`); the plaintext is returned once from `issueApiKey` and cannot be recovered afterward. `isApiKey` attaches `req.apiKey = { id, name, scopes, tenantId? }` on success.
+
+To require either a user token or a service API key on the same route, chain your own small middleware that tries `isAuth` and falls back to `isApiKey`.
+
 ## Build Checks
 
 ```bash
