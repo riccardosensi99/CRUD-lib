@@ -3,6 +3,7 @@ import { verifyToken } from '../utils/jwt.js';
 
 export type AuthRequest = Request & { user?: { id: number | string; role: 'USER' | 'ADMIN' } };
 
+/** Verifies the `Authorization: Bearer <token>` header and attaches `req.user`. Responds 401 if missing/invalid. */
 export function isAuth(req: AuthRequest, res: Response, next: NextFunction) {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) {

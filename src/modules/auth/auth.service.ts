@@ -107,6 +107,13 @@ async function issueTokens(
   return { accessToken, refreshToken, refreshTokenId, familyId: resolvedFamilyId };
 }
 
+/**
+ * Builds the auth service used by `createAuthRouter`. Can also be used
+ * directly to drive auth from a custom transport (CLI, GraphQL, etc.).
+ * Optional deps (`refreshTokenRepo`, `passwordResetTokenRepo`,
+ * `emailVerificationTokenRepo`, `oauthAccountRepo`) enable the matching
+ * flow; without them the relevant methods throw a `*_UNSUPPORTED` error.
+ */
 export function makeAuthService(deps: AuthServiceDeps) {
   const { userRepo } = deps;
 

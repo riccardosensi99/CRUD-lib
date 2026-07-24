@@ -11,6 +11,11 @@ import {
 import { makeUserService } from './user.service.js';
 import type { UserRepo } from '../../core/ports/user.repo.js';
 
+/**
+ * Builds the user CRUD router: admin list/create/update/delete plus
+ * `GET/PUT /me` for the authenticated user. Admin routes require an
+ * `ADMIN` bearer token; `/:id` routes allow the resource owner or an admin.
+ */
 export function createUserRouter(deps: { userRepo: UserRepo }) {
   const router = Router();
   const service = makeUserService({ userRepo: deps.userRepo });
