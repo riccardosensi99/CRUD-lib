@@ -45,6 +45,16 @@ BCRYPT_SALT="10"
 
 `JWT_ACCESS_EXPIRES_IN` and `JWT_REFRESH_EXPIRES_IN` have defaults. `JWT_SECRET` and `DATABASE_URL` must be set before using the default auth and Prisma paths.
 
+## CLI Scaffolding
+
+Generate a starter Prisma schema, `.env`, and Express server in the current directory:
+
+```bash
+npx my-crud-lib init
+```
+
+This creates `prisma/schema.prisma`, `src/server.ts`, and `.env` (skipping any that already exist). Edit `.env` with your `DATABASE_URL` and `JWT_SECRET`, then follow the printed next steps to install dependencies and run the server.
+
 ## Quickstart With Express And Prisma
 
 ```ts
