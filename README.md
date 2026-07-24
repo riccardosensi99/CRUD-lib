@@ -417,6 +417,24 @@ With `JWT_ALG=RS256`, `createLibrary`/`mountDefaultRoutes` automatically mount `
 
 `JWT_PRIVATE_KEY`/`JWT_PUBLIC_KEY` accept PEM content directly, or with literal `\n` sequences (common when stored as a single-line CI/CD secret).
 
+## Idempotency Keys
+
+For clients that retry on timeout or fire the same intent from multiple parallel callers (common with async workers and microservice retries), `POST /auth/register` and `POST /users` can replay a stored response instead of running twice:
+
+```ts
+import { createLibrary, createServer } from "my-crud-lib";
+import { makeMemoryIdempotencyStore } from "my-crud-lib/adapters/memory"; // or makePrismaIdempotencyStore
+
+const app = createServer();
+const lib = createLibrary(
+  { routesPrefix: "/api" },
+  { userRepo, idempotencyStore: makeMemoryIdempotencyStore() }
+);
+app.use(lib.router);
+```
+
+Send `Idempotency-Key: <uuid>` on the request. The first call runs normally and its response is stored; any repeat with the same key returns the exact same response (marked with an `Idempotent-Replay: true` header) without re-executing the handler. Requests without the header are unaffected — idempotency is opt-in per call. The `idempotent(store, options?)` middleware is also exported standalone for use on your own routes.
+
 ## Build Checks
 
 ```bash

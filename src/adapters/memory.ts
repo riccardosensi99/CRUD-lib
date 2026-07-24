@@ -1,5 +1,6 @@
 import type { UserRepo } from '../core/ports/user.repo.js';
 import type { ApiKeyRecord, ApiKeyRepo } from '../core/ports/apiKey.repo.js';
+import type { IdempotencyRecord, IdempotencyStore } from '../core/ports/idempotency.repo.js';
 import type { AdminUpdateUserInput, Role, UserListItem } from '../modules/user/user.types.js';
 
 type StoredUser = UserListItem & { passwordHash: string };
@@ -158,6 +159,30 @@ export function makeMemoryApiKeyRepo(): ApiKeyRepo {
       const record = keys.get(id);
       if (!record) return;
       keys.set(id, { ...record, revokedAt: input.revokedAt ?? new Date() });
+    },
+  };
+}
+
+/** In-memory `IdempotencyStore` implementation. Useful for demos, prototyping, and tests. */
+export function makeMemoryIdempotencyStore(): IdempotencyStore {
+  const records = new Map<string, IdempotencyRecord & { expiresAt: number | null }>();
+
+  return {
+    async get(key) {
+      const record = records.get(key);
+      if (!record) return null;
+      if (record.expiresAt !== null && record.expiresAt <= Date.now()) {
+        records.delete(key);
+        return null;
+      }
+      return { status: record.status, body: record.body };
+    },
+
+    async set(key, record, ttlMs) {
+      records.set(key, {
+        ...record,
+        expiresAt: ttlMs !== undefined ? Date.now() + ttlMs : null,
+      });
     },
   };
 }
