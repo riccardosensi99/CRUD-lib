@@ -51,6 +51,7 @@ export {
   adminUpdateUserSchema,
   listUsersQuerySchema,
   updateMeSchema,
+  userIdsBatchSchema,
 } from './modules/user/user.schemas.js';
 export { isAuth, type AuthRequest } from './middleware/isAuth.js';
 export { hasRole, isSelfOrAdmin } from './middleware/hasRole.js';

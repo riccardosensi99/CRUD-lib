@@ -47,7 +47,12 @@ export const adminUpdateUserSchema = z.object({
   avatarUrl: z.string().url().nullish(),
 });
 
+export const userIdsBatchSchema = z.object({
+  ids: z.array(z.union([z.string(), z.number()])).min(1).max(100),
+});
+
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
+export type UserIdsBatchInput = z.infer<typeof userIdsBatchSchema>;
 export type UpdateMeInput = z.infer<typeof updateMeSchema>;
 export type AdminCreateUserInput = z.infer<typeof adminCreateUserSchema>;
 export type AdminUpdateUserInput = z.infer<typeof adminUpdateUserSchema>;

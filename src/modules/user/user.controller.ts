@@ -8,6 +8,7 @@ import {
   updateMeSchema,
   adminCreateUserSchema,
   adminUpdateUserSchema,
+  userIdsBatchSchema,
 } from './user.schemas.js';
 import { makeUserService } from './user.service.js';
 import type { UserRepo } from '../../core/ports/user.repo.js';
@@ -62,6 +63,16 @@ export function createUserRouter(deps: UserRouterDeps) {
       const body = adminCreateUserSchema.parse(req.body);
       const data = await service.adminCreateUser(body);
       res.status(201).json(data);
+    } catch (err) {
+      sendAppError(res, err);
+    }
+  });
+
+  router.post('/batch', isAuth, hasRole('ADMIN'), async (req: AuthRequest, res) => {
+    try {
+      const { ids } = userIdsBatchSchema.parse(req.body);
+      const data = await service.getUsersByIds(ids, req.user!.tenantId);
+      res.json({ items: data });
     } catch (err) {
       sendAppError(res, err);
     }

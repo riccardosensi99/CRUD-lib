@@ -54,6 +54,11 @@ export function makeMemoryUserRepo(): UserRepo {
       return user ? toPublic(user) : null;
     },
 
+    async findManyByIds(ids) {
+      const wanted = new Set(ids.map((id) => Number(id)));
+      return [...users.values()].filter((u) => wanted.has(Number(u.id))).map(toPublic);
+    },
+
     async findByEmail(email) {
       const user = [...users.values()].find((u) => u.email === email);
       return user ? { ...toPublic(user), passwordHash: user.passwordHash } : null;

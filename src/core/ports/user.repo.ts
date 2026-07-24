@@ -21,6 +21,12 @@ export interface UserRepo {
   findById(id: number | string): Promise<UserListItem | null>;
   /** Must include `passwordHash` so the auth service can verify credentials. */
   findByEmail(email: string): Promise<UserListItem & { passwordHash?: string } | null>;
+  /**
+   * Resolves multiple users in one call, to avoid N+1/N-parallel lookups
+   * across services. Returns only the users found; unmatched ids are
+   * silently omitted. Optional — falls back to N `findById` calls when absent.
+   */
+  findManyByIds?(ids: Array<number | string>): Promise<UserListItem[]>;
   create(input: { email: string; passwordHash: string; name?: string | null; role?: string; bio?: string | null; avatarUrl?: string | null; tenantId?: string | number | null }): Promise<UserListItem>;
   update(id: number | string, input: AdminUpdateUserInput): Promise<UserListItem>;
   delete(id: number | string): Promise<void>;

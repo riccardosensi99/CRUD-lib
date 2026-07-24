@@ -41,6 +41,17 @@ export function makeUserService(deps: { userRepo: UserRepo }) {
       return user;
     },
 
+    /** Resolves multiple users in one call. Uses `UserRepo.findManyByIds` when the adapter supports it, otherwise falls back to N `findById` calls. */
+    async getUsersByIds(ids: Array<number | string>, tenantId?: string | number): Promise<UserListItem[]> {
+      const users = userRepo.findManyByIds
+        ? await userRepo.findManyByIds(ids)
+        : (await Promise.all(ids.map((id) => userRepo.findById(id)))).filter((u): u is UserListItem => u !== null);
+
+      return tenantId === undefined
+        ? users
+        : users.filter((u) => String(u.tenantId ?? '') === String(tenantId));
+    },
+
     updateMe(userId: number | string, data: UpdateMeInput) {
       return userRepo.updateMe(userId, data);
     },

@@ -435,6 +435,24 @@ app.use(lib.router);
 
 Send `Idempotency-Key: <uuid>` on the request. The first call runs normally and its response is stored; any repeat with the same key returns the exact same response (marked with an `Idempotent-Replay: true` header) without re-executing the handler. Requests without the header are unaffected — idempotency is opt-in per call. The `idempotent(store, options?)` middleware is also exported standalone for use on your own routes.
 
+## Bulk User Lookup
+
+`POST /users/batch` resolves multiple users in a single call, for services that would otherwise fire N parallel `GET /users/:id` requests:
+
+```http
+POST /users/batch
+Authorization: Bearer <admin accessToken>
+Content-Type: application/json
+
+{ "ids": [1, 2, 3] }
+```
+
+```json
+{ "items": [ { "id": 1, "email": "...", ... }, { "id": 2, "email": "...", ... } ] }
+```
+
+Unmatched ids are silently omitted rather than causing an error. Requires an `ADMIN` token and, like `GET /users`, is automatically scoped to the admin's `tenantId` when present. Accepts up to 100 ids per call. `UserRepo.findManyByIds` is optional on custom adapters — when absent, the service falls back to N `findById` calls, so existing adapters keep working unchanged.
+
 ## Build Checks
 
 ```bash
