@@ -20,10 +20,12 @@ export function createUserRouter(deps: { userRepo: UserRepo }) {
   const router = Router();
   const service = makeUserService({ userRepo: deps.userRepo });
 
-  router.get('/', isAuth, hasRole('ADMIN'), async (req, res) => {
+  router.get('/', isAuth, hasRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       const q = listUsersQuerySchema.parse(req.query);
-      const data = await service.listUsers(q);
+      // An admin scoped to a tenant can only ever list users within that tenant.
+      const scopedQuery = req.user!.tenantId !== undefined ? { ...q, tenantId: req.user!.tenantId } : q;
+      const data = await service.listUsers(scopedQuery);
       res.json(data);
     } catch (err) {
       sendAppError(res, err);
@@ -60,7 +62,7 @@ export function createUserRouter(deps: { userRepo: UserRepo }) {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid id' } });
 
-    const data = await service.getUserById(id);
+    const data = await service.getUserById(id, req.user!.tenantId);
     if (!data) return sendAppError(res, new Error('USER_NOT_FOUND'));
     res.json(data);
   });
@@ -69,6 +71,9 @@ export function createUserRouter(deps: { userRepo: UserRepo }) {
     try {
       const id = Number(req.params.id);
       if (Number.isNaN(id)) return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid id' } });
+
+      const existing = await service.getUserById(id, req.user!.tenantId);
+      if (!existing) return sendAppError(res, new Error('USER_NOT_FOUND'));
 
       const body = adminUpdateUserSchema.parse(req.body);
 
@@ -84,10 +89,13 @@ export function createUserRouter(deps: { userRepo: UserRepo }) {
     }
   });
 
-  router.delete('/:id', isAuth, hasRole('ADMIN'), async (req, res) => {
+  router.delete('/:id', isAuth, hasRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       const id = Number(req.params.id);
       if (Number.isNaN(id)) return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid id' } });
+
+      const existing = await service.getUserById(id, req.user!.tenantId);
+      if (!existing) return sendAppError(res, new Error('USER_NOT_FOUND'));
 
       await service.adminDeleteUser(id);
       res.status(204).end();

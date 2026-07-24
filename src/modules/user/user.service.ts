@@ -25,17 +25,20 @@ export function makeUserService(deps: { userRepo: UserRepo }) {
 
   return {
     async listUsers(q: ListUsersQuery): Promise<Paginated<UserListItem>> {
-      const { page, pageSize, role, search } = q;
+      const { page, pageSize, role, search, tenantId } = q;
       const { sortField, sortDir } = parseSort(q.sort);
       const [total, items] = await Promise.all([
-        userRepo.count({ role, search }),
-        userRepo.findMany({ page, pageSize, role, search, sortField, sortDir }),
+        userRepo.count({ role, search, tenantId }),
+        userRepo.findMany({ page, pageSize, role, search, tenantId, sortField, sortDir }),
       ]);
       return { page, pageSize, total, totalPages: Math.ceil(total / pageSize), items };
     },
 
-    getUserById(id: number | string) {
-      return userRepo.findById(id);
+    async getUserById(id: number | string, tenantId?: string | number) {
+      const user = await userRepo.findById(id);
+      if (!user) return null;
+      if (tenantId !== undefined && String(user.tenantId ?? '') !== String(tenantId)) return null;
+      return user;
     },
 
     updateMe(userId: number | string, data: UpdateMeInput) {
@@ -54,6 +57,7 @@ export function makeUserService(deps: { userRepo: UserRepo }) {
         role: input.role ?? 'USER',
         bio: input.bio ?? null,
         avatarUrl: input.avatarUrl ?? null,
+        tenantId: input.tenantId ?? null,
       });
     },
 

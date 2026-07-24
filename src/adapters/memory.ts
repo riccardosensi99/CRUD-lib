@@ -8,8 +8,9 @@ function toPublic(user: StoredUser): UserListItem {
   return safeUser;
 }
 
-function matchesFilters(user: StoredUser, role?: string, search?: string): boolean {
+function matchesFilters(user: StoredUser, role?: string, search?: string, tenantId?: string | number): boolean {
   if (role && user.role !== role) return false;
+  if (tenantId !== undefined && String(user.tenantId ?? '') !== String(tenantId)) return false;
   if (search?.trim()) {
     const needle = search.trim().toLowerCase();
     const haystack = `${user.email} ${user.name ?? ''}`.toLowerCase();
@@ -35,13 +36,13 @@ export function makeMemoryUserRepo(): UserRepo {
   let nextId = 1;
 
   return {
-    async count({ role, search } = {}) {
-      return [...users.values()].filter((u) => matchesFilters(u, role, search)).length;
+    async count({ role, search, tenantId } = {}) {
+      return [...users.values()].filter((u) => matchesFilters(u, role, search, tenantId)).length;
     },
 
-    async findMany({ page, pageSize, role, search, sortField, sortDir }) {
+    async findMany({ page, pageSize, role, search, tenantId, sortField, sortDir }) {
       const filtered = [...users.values()]
-        .filter((u) => matchesFilters(u, role, search))
+        .filter((u) => matchesFilters(u, role, search, tenantId))
         .sort((a, b) => compare(a, b, sortField, sortDir));
       return filtered.slice((page - 1) * pageSize, page * pageSize).map(toPublic);
     },
@@ -64,6 +65,7 @@ export function makeMemoryUserRepo(): UserRepo {
         passwordHash: input.passwordHash,
         name: input.name ?? null,
         role: (input.role as Role) === 'ADMIN' ? 'ADMIN' : 'USER',
+        tenantId: input.tenantId ?? null,
         emailVerifiedAt: null,
         createdAt: now,
         updatedAt: now,

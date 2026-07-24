@@ -7,6 +7,7 @@ export type JwtPayload = {
   typ?: "refresh";
   jti?: string;
   fam?: string;
+  tenantId?: number | string;
 };
 
 export function signAccessToken(payload: JwtPayload): string {

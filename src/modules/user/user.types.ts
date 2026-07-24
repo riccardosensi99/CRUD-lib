@@ -5,6 +5,8 @@ export type UserListItem = {
   email: string;
   name: string | null;
   role: Role;
+  /** Optional tenant/organization scope for multi-tenant SaaS deployments. Absent in single-tenant apps. */
+  tenantId?: string | number | null;
   emailVerifiedAt?: Date | string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -16,6 +18,7 @@ export type ListUsersQuery = {
   pageSize: number;
   role?: Role;
   search?: string;
+  tenantId?: string | number;
   sort?: `${'createdAt'|'updatedAt'|'email'|'name'}:${'asc'|'desc'}`;
 };
 
@@ -40,6 +43,7 @@ export type AdminCreateUserInput = {
   role?: Role;
   bio?: string | null;
   avatarUrl?: string | null;
+  tenantId?: string | number | null;
 };
 
 export type AdminUpdateUserInput = {
