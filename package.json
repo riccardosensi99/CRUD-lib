@@ -93,7 +93,8 @@
     "prebuild": "node scripts/prisma-generate.mjs",
     "build": "tsc",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "ci": "npm test && npm run smoke:exports && npm run smoke:auth-hardening && npm run smoke:auth-service && npm --cache .npm-cache pack --dry-run",
+    "test:api": "npm run build && node --experimental-vm-modules node_modules/.bin/jest --config jest.config.mjs",
+    "ci": "npm test && npm run test:api && npm run smoke:exports && npm run smoke:auth-hardening && npm run smoke:auth-service && npm --cache .npm-cache pack --dry-run",
     "start": "node dist/index.js",
     "dev": "node --loader ts-node/esm --no-warnings=ExperimentalWarning src/dev.ts",
     "dev:db:up": "docker-compose up -d",
@@ -111,13 +112,15 @@
     "generate:secret": "node scripts/generateSecret.js"
   },
   "devDependencies": {
+    "@prisma/client": "^6.14.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.3.0",
+    "jest": "^30.4.2",
     "prisma": "^6.14.0",
-    "@prisma/client": "^6.14.0",
+    "supertest": "^7.2.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
   },
@@ -128,10 +131,10 @@
     "zod": "^3.23.8"
   },
   "peerDependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "body-parser": "^1.20.2",
     "@prisma/client": "^6.14.0",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
     "prisma": "^6.14.0"
   },
   "peerDependenciesMeta": {
