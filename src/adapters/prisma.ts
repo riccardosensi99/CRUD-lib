@@ -13,9 +13,10 @@ const dateOrNow = (value?: Date) => value ?? new Date();
 /** `UserRepo` implementation backed by the bundled Prisma schema (`prisma/schema.prisma`). */
 export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
   return {
-    async count({ role, search }) {
+    async count({ role, search, tenantId }) {
       const where: Prisma.UserWhereInput = {};
       if (role) where.role = role as any;
+      if (tenantId !== undefined) where.tenantId = String(tenantId) as any;
       if (search?.trim()) {
         const s = search.trim();
         where.OR = [
@@ -26,9 +27,10 @@ export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
       return prisma.user.count({ where });
     },
 
-    async findMany({ page, pageSize, role, search, sortField, sortDir }) {
+    async findMany({ page, pageSize, role, search, tenantId, sortField, sortDir }) {
       const where: Prisma.UserWhereInput = {};
       if (role) where.role = role as any;
+      if (tenantId !== undefined) where.tenantId = String(tenantId) as any;
       if (search?.trim()) {
         const s = search.trim();
         where.OR = [
@@ -47,6 +49,7 @@ export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
           email: true,
           name: true,
           role: true,
+          tenantId: true,
           createdAt: true,
           updatedAt: true,
           profile: { select: { bio: true, avatarUrl: true } },
@@ -63,6 +66,7 @@ export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
           email: true,
           name: true,
           role: true,
+          tenantId: true,
           createdAt: true,
           updatedAt: true,
           profile: { select: { bio: true, avatarUrl: true } },
@@ -78,6 +82,7 @@ export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
           email: true,
           name: true,
           role: true,
+          tenantId: true,
           passwordHash: true,
           createdAt: true,
           updatedAt: true,
@@ -93,10 +98,11 @@ export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
           passwordHash: input.passwordHash,
           name: input.name ?? null,
           role: (input.role as any) ?? 'USER',
+          tenantId: input.tenantId != null ? String(input.tenantId) : null,
           profile: { create: { bio: input.bio ?? null, avatarUrl: input.avatarUrl ?? null } },
         },
         select: {
-          id: true, email: true, name: true, role: true,
+          id: true, email: true, name: true, role: true, tenantId: true,
           createdAt: true, updatedAt: true,
           profile: { select: { bio: true, avatarUrl: true } },
         },

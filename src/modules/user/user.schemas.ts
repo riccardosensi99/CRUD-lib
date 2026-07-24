@@ -20,6 +20,7 @@ export const listUsersQuerySchema = z.object({
     .transform((v) => (v === '' ? undefined : v))
     .optional(),
   role: z.enum(['USER', 'ADMIN']).optional(),
+  tenantId: z.union([z.string(), z.coerce.number()]).optional(),
   sort: SortEnum.default('createdAt:desc'),
 });
 
@@ -36,6 +37,7 @@ export const adminCreateUserSchema = z.object({
   role: z.enum(['USER', 'ADMIN']).default('USER'),
   bio: z.string().max(500).nullish(),
   avatarUrl: z.string().url().nullish(),
+  tenantId: z.union([z.string(), z.number()]).nullish(),
 });
 
 export const adminUpdateUserSchema = z.object({

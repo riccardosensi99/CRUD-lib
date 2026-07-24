@@ -84,11 +84,11 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 async function issueTokens(
-  user: Pick<AuthUser, 'id' | 'role'>,
+  user: Pick<AuthUser, 'id' | 'role' | 'tenantId'>,
   deps: AuthServiceDeps,
   familyId?: string,
 ): Promise<AuthTokens & { refreshTokenId?: string; familyId?: string }> {
-  const payload = { sub: user.id, role: user.role };
+  const payload = { sub: user.id, role: user.role, ...(user.tenantId != null ? { tenantId: user.tenantId } : {}) };
   const accessToken = signAccessToken(payload);
 
   if (!deps.refreshTokenRepo) {
@@ -285,6 +285,7 @@ export function makeAuthService(deps: AuthServiceDeps) {
         passwordHash,
         name: params.name ?? null,
         role,
+        tenantId: params.tenantId ?? null,
       });
 
       const authUser = toAuthUser(user);

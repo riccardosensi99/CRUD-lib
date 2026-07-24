@@ -358,6 +358,30 @@ import {
 - `mapKnownError(err)` normalizes any thrown value (a plain `Error`, a `ZodError`, or an `AppError`) into an `AppError` with a stable `code` and `statusCode`; Zod issues are formatted into `details` via `formatZodIssues`.
 - `formatZodIssues(issues)` flattens `ZodIssue[]` into `{ field, message }[]` directly, for use with your own Zod schemas outside this library's routes.
 
+## Multi-Tenancy (SaaS)
+
+An optional `tenantId` scopes users to a tenant/organization, for SaaS deployments that share one database across customers:
+
+```ts
+import { requireTenant, isSameTenant } from "my-crud-lib/middleware";
+
+// register/create accept an optional tenantId
+await service.registerUser({ email, password, tenantId: "tenant-a" });
+
+// tenantId is embedded in access/refresh tokens and available as req.user.tenantId
+app.get("/internal/reports", isAuth, requireTenant(), handler);
+```
+
+Behavior:
+- `POST /auth/register` and `POST /users` accept an optional `tenantId`.
+- Access/refresh tokens carry `tenantId` when the user has one; `isAuth` exposes it as `req.user.tenantId`.
+- Admin `GET /users` is automatically scoped to `req.user.tenantId` when the admin's token carries one — an admin token scoped to a tenant can never list another tenant's users.
+- `GET/PUT/DELETE /users/:id` respond `404` (not `403`, to avoid leaking existence) when the target user belongs to a different tenant.
+- `requireTenant()` middleware rejects requests from tokens without a `tenantId`.
+- `isSameTenant(getResourceTenantId?)` middleware compares `req.user.tenantId` against a resolved resource tenant id (defaults to `req.params.tenantId`), for your own routes.
+
+Single-tenant apps are unaffected: omit `tenantId` everywhere and behavior is identical to before.
+
 ## Build Checks
 
 ```bash
