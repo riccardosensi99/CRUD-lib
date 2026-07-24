@@ -268,6 +268,37 @@ app.use(
 
 These dependencies are optional. Without them, the existing stateless refresh-token flow remains available and password reset, email verification, and OAuth methods report that they are not configured.
 
+## Error Responses
+
+Routes created by this library respond to errors with a consistent shape:
+
+```json
+{
+  "error": {
+    "code": "INVALID_CREDENTIALS",
+    "message": "Invalid credentials"
+  }
+}
+```
+
+Validation errors additionally include a `details` array with Zod issues.
+
+The typed error classes and helpers are available for your own routes:
+
+```ts
+import {
+  AppError,
+  EmailAlreadyExistsError,
+  errorHandler,
+  mapKnownError,
+  sendAppError,
+} from "my-crud-lib/errors";
+```
+
+- `errorHandler` is an Express error-handling middleware (`app.use(errorHandler)`) for routes outside this library that call the same services/repos and `next(err)` their failures.
+- `sendAppError(res, err)` writes the same JSON shape directly from a catch block.
+- `mapKnownError(err)` normalizes any thrown value (a plain `Error`, a Zod error, or an `AppError`) into an `AppError` with a stable `code` and `statusCode`.
+
 ## Build Checks
 
 ```bash

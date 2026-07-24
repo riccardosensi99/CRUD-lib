@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { isAuth, type AuthRequest } from '../../middleware/isAuth.js';
+import { sendAppError } from '../../utils/errorHandler.js';
 import {
   emailVerificationConfirmSchema,
   emailVerificationRequestSchema,
@@ -20,10 +21,8 @@ export function createAuthRouter(deps: AuthServiceDeps) {
       const data = registerSchema.parse(req.body);
       const result = await service.registerUser(data);
       return res.status(201).json(result);
-    } catch (err: any) {
-      if (err?.message === 'EMAIL_TAKEN') return res.status(409).json({ error: 'Email already registered' });
-      if (err?.issues) return res.status(400).json({ error: 'ValidationError', details: err.issues });
-      return res.status(500).json({ error: 'InternalError' });
+    } catch (err) {
+      return sendAppError(res, err);
     }
   });
 
@@ -32,34 +31,32 @@ export function createAuthRouter(deps: AuthServiceDeps) {
       const data = loginSchema.parse(req.body);
       const result = await service.loginUser(data);
       return res.json(result);
-    } catch (err: any) {
-      if (err?.message === 'INVALID_CREDENTIALS') return res.status(401).json({ error: 'Invalid credentials' });
-      if (err?.issues) return res.status(400).json({ error: 'ValidationError', details: err.issues });
-      return res.status(500).json({ error: 'InternalError' });
+    } catch (err) {
+      return sendAppError(res, err);
     }
   });
 
   router.post('/refresh', async (req: Request, res: Response) => {
     try {
       const { refreshToken } = req.body as { refreshToken?: string };
-      if (!refreshToken) return res.status(400).json({ error: 'Missing refreshToken' });
+      if (!refreshToken) return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Missing refreshToken' } });
 
       const tokens = await service.refreshSession(refreshToken);
       return res.json(tokens);
     } catch {
-      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+      return sendAppError(res, new Error('INVALID_REFRESH_TOKEN'));
     }
   });
 
   router.post('/logout', async (req: Request, res: Response) => {
     try {
       const { refreshToken } = req.body as { refreshToken?: string };
-      if (!refreshToken) return res.status(400).json({ error: 'Missing refreshToken' });
+      if (!refreshToken) return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Missing refreshToken' } });
 
       await service.revokeRefreshToken(refreshToken);
       return res.status(204).send();
     } catch {
-      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+      return sendAppError(res, new Error('INVALID_REFRESH_TOKEN'));
     }
   });
 
@@ -68,10 +65,8 @@ export function createAuthRouter(deps: AuthServiceDeps) {
       const data = passwordResetRequestSchema.parse(req.body);
       await service.requestPasswordReset(data);
       return res.status(202).json({ ok: true });
-    } catch (err: any) {
-      if (err?.message === 'PASSWORD_RESET_UNSUPPORTED') return res.status(501).json({ error: 'Password reset is not configured' });
-      if (err?.issues) return res.status(400).json({ error: 'ValidationError', details: err.issues });
-      return res.status(500).json({ error: 'InternalError' });
+    } catch (err) {
+      return sendAppError(res, err);
     }
   });
 
@@ -80,11 +75,8 @@ export function createAuthRouter(deps: AuthServiceDeps) {
       const data = passwordResetConfirmSchema.parse(req.body);
       await service.confirmPasswordReset(data);
       return res.json({ ok: true });
-    } catch (err: any) {
-      if (err?.message === 'PASSWORD_RESET_UNSUPPORTED') return res.status(501).json({ error: 'Password reset is not configured' });
-      if (err?.message === 'INVALID_PASSWORD_RESET_TOKEN') return res.status(400).json({ error: 'Invalid or expired password reset token' });
-      if (err?.issues) return res.status(400).json({ error: 'ValidationError', details: err.issues });
-      return res.status(500).json({ error: 'InternalError' });
+    } catch (err) {
+      return sendAppError(res, err);
     }
   });
 
@@ -93,10 +85,8 @@ export function createAuthRouter(deps: AuthServiceDeps) {
       const data = emailVerificationRequestSchema.parse(req.body);
       await service.requestEmailVerification(data);
       return res.status(202).json({ ok: true });
-    } catch (err: any) {
-      if (err?.message === 'EMAIL_VERIFICATION_UNSUPPORTED') return res.status(501).json({ error: 'Email verification is not configured' });
-      if (err?.issues) return res.status(400).json({ error: 'ValidationError', details: err.issues });
-      return res.status(500).json({ error: 'InternalError' });
+    } catch (err) {
+      return sendAppError(res, err);
     }
   });
 
@@ -105,18 +95,15 @@ export function createAuthRouter(deps: AuthServiceDeps) {
       const data = emailVerificationConfirmSchema.parse(req.body);
       const result = await service.confirmEmailVerification(data);
       return res.json(result);
-    } catch (err: any) {
-      if (err?.message === 'EMAIL_VERIFICATION_UNSUPPORTED') return res.status(501).json({ error: 'Email verification is not configured' });
-      if (err?.message === 'INVALID_EMAIL_VERIFICATION_TOKEN') return res.status(400).json({ error: 'Invalid or expired email verification token' });
-      if (err?.issues) return res.status(400).json({ error: 'ValidationError', details: err.issues });
-      return res.status(500).json({ error: 'InternalError' });
+    } catch (err) {
+      return sendAppError(res, err);
     }
   });
 
   router.get('/me', isAuth, async (req: AuthRequest, res: Response) => {
     const userId = req.user!.id;
     const me = await service.getMe(userId);
-    if (!me) return res.status(404).json({ error: 'User not found' });
+    if (!me) return sendAppError(res, new Error('USER_NOT_FOUND'));
     return res.json(me);
   });
 
