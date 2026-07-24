@@ -1,4 +1,5 @@
 import type { UserRepo } from '../core/ports/user.repo.js';
+import type { ApiKeyRecord, ApiKeyRepo } from '../core/ports/apiKey.repo.js';
 import type { AdminUpdateUserInput, Role, UserListItem } from '../modules/user/user.types.js';
 
 type StoredUser = UserListItem & { passwordHash: string };
@@ -126,6 +127,37 @@ export function makeMemoryUserRepo(): UserRepo {
       const updated: StoredUser = { ...user, emailVerifiedAt: verifiedAt, updatedAt: new Date().toISOString() };
       users.set(Number(id), updated);
       return toPublic(updated);
+    },
+  };
+}
+
+/** In-memory `ApiKeyRepo` implementation. Useful for demos, prototyping, and tests. */
+export function makeMemoryApiKeyRepo(): ApiKeyRepo {
+  const keys = new Map<string, ApiKeyRecord>();
+
+  return {
+    async findById(id) {
+      return keys.get(id) ?? null;
+    },
+
+    async create(input) {
+      const record: ApiKeyRecord = {
+        id: input.id,
+        name: input.name ?? null,
+        keyHash: input.keyHash,
+        scopes: input.scopes ?? [],
+        tenantId: input.tenantId ?? null,
+        revokedAt: null,
+        createdAt: new Date().toISOString(),
+      };
+      keys.set(record.id, record);
+      return record;
+    },
+
+    async revoke(id, input = {}) {
+      const record = keys.get(id);
+      if (!record) return;
+      keys.set(id, { ...record, revokedAt: input.revokedAt ?? new Date() });
     },
   };
 }

@@ -1,1 +1,1 @@
-export { makeMemoryUserRepo } from './adapters/memory.js';
+export { makeMemoryApiKeyRepo, makeMemoryUserRepo } from './adapters/memory.js';

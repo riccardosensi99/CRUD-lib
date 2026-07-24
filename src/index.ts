@@ -53,6 +53,9 @@ export {
 export { isAuth, type AuthRequest } from './middleware/isAuth.js';
 export { hasRole, isSelfOrAdmin } from './middleware/hasRole.js';
 export { requireTenant, isSameTenant } from './middleware/tenant.js';
+export { isApiKey, type ApiKeyRequest } from './middleware/isApiKey.js';
+export type { ApiKeyRecord, ApiKeyRepo } from './core/ports/apiKey.repo.js';
+export { issueApiKey, verifyApiKey } from './utils/apiKey.js';
 export {
   AppError,
   EmailAlreadyExistsError,
@@ -69,13 +72,14 @@ export {
   type FieldValidationIssue,
 } from './utils/errorHandler.js';
 export {
+  makePrismaApiKeyRepo,
   makePrismaEmailVerificationTokenRepo,
   makePrismaOAuthAccountRepo,
   makePrismaPasswordResetTokenRepo,
   makePrismaRefreshTokenRepo,
   makePrismaUserRepo,
 } from './adapters/prisma.js';
-export { makeMemoryUserRepo } from './adapters/memory.js';
+export { makeMemoryApiKeyRepo, makeMemoryUserRepo } from './adapters/memory.js';
 
 import type { UserRepo } from './core/ports/user.repo.js';
 import type { AuthServiceDeps } from './modules/auth/auth.types.js';

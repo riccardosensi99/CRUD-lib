@@ -94,3 +94,15 @@ enum Role {
   USER
   ADMIN
 }
+
+model ApiKey {
+  id        String    @id
+  name      String?
+  keyHash   String
+  scopes    String[]  @default([])
+  tenantId  String?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId])
+}
