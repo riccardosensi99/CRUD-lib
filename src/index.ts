@@ -61,6 +61,8 @@ export type { ApiKeyRecord, ApiKeyRepo } from './core/ports/apiKey.repo.js';
 export { issueApiKey, verifyApiKey } from './utils/apiKey.js';
 export { idempotent } from './middleware/idempotent.js';
 export type { IdempotencyRecord, IdempotencyStore } from './core/ports/idempotency.repo.js';
+export { rateLimit } from './middleware/rateLimit.js';
+export type { RateLimiter, RateLimitResult } from './core/ports/rateLimiter.repo.js';
 export {
   AppError,
   EmailAlreadyExistsError,
@@ -85,11 +87,17 @@ export {
   makePrismaRefreshTokenRepo,
   makePrismaUserRepo,
 } from './adapters/prisma.js';
-export { makeMemoryApiKeyRepo, makeMemoryIdempotencyStore, makeMemoryUserRepo } from './adapters/memory.js';
+export {
+  makeMemoryApiKeyRepo,
+  makeMemoryIdempotencyStore,
+  makeMemoryRateLimiter,
+  makeMemoryUserRepo,
+} from './adapters/memory.js';
 
 import type { UserRepo } from './core/ports/user.repo.js';
 import type { AuthServiceDeps } from './modules/auth/auth.types.js';
 import type { IdempotencyStore } from './core/ports/idempotency.repo.js';
+import type { RateLimiter } from './core/ports/rateLimiter.repo.js';
 import { createAuthRouter } from './modules/auth/auth.controller.js';
 import { createUserRouter } from './modules/user/user.controller.js';
 import { createJwksRouter } from './modules/jwks/jwks.controller.js';
@@ -108,6 +116,8 @@ export type LibraryDeps = {
   userRepo: UserRepo;
   /** Enables `Idempotency-Key` support on `POST /auth/register` and `POST /users`. */
   idempotencyStore?: IdempotencyStore;
+  /** Enables rate limiting on `POST /auth/login` and `POST /auth/register`. */
+  rateLimiter?: RateLimiter;
 };
 
 function normalizePrefix(prefix?: string): string {
@@ -140,7 +150,12 @@ export function createLibrary(config: LibraryConfig, deps: LibraryDeps) {
 
   router.use(
     `${prefix}/auth`,
-    createAuthRouter({ userRepo: deps.userRepo, idempotencyStore: deps.idempotencyStore, ...config.auth }),
+    createAuthRouter({
+      userRepo: deps.userRepo,
+      idempotencyStore: deps.idempotencyStore,
+      rateLimiter: deps.rateLimiter,
+      ...config.auth,
+    }),
   );
   router.use(`${prefix}/users`, createUserRouter({ userRepo: deps.userRepo, idempotencyStore: deps.idempotencyStore }));
 

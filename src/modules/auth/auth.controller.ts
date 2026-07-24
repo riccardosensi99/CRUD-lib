@@ -1,8 +1,10 @@
 import { Router, type Request, type Response } from 'express';
 import { isAuth, type AuthRequest } from '../../middleware/isAuth.js';
 import { idempotent } from '../../middleware/idempotent.js';
+import { rateLimit } from '../../middleware/rateLimit.js';
 import { sendAppError } from '../../utils/errorHandler.js';
 import type { IdempotencyStore } from '../../core/ports/idempotency.repo.js';
+import type { RateLimiter } from '../../core/ports/rateLimiter.repo.js';
 import {
   emailVerificationConfirmSchema,
   emailVerificationRequestSchema,
@@ -17,6 +19,8 @@ import type { AuthServiceDeps } from './auth.types.js';
 export type AuthRouterDeps = AuthServiceDeps & {
   /** Enables `Idempotency-Key` support on `POST /register` when provided. */
   idempotencyStore?: IdempotencyStore;
+  /** Enables rate limiting on `POST /login` and `POST /register` when provided, keyed by IP + route. */
+  rateLimiter?: RateLimiter;
 };
 
 /**
@@ -28,7 +32,14 @@ export type AuthRouterDeps = AuthServiceDeps & {
 export function createAuthRouter(deps: AuthRouterDeps) {
   const router = Router();
   const service = makeAuthService(deps);
-  const registerMiddleware = deps.idempotencyStore ? [idempotent(deps.idempotencyStore)] : [];
+
+  const registerMiddleware = [
+    ...(deps.rateLimiter ? [rateLimit(deps.rateLimiter, { keyFn: (req) => `register:${req.ip}` })] : []),
+    ...(deps.idempotencyStore ? [idempotent(deps.idempotencyStore)] : []),
+  ];
+  const loginMiddleware = deps.rateLimiter
+    ? [rateLimit(deps.rateLimiter, { keyFn: (req) => `login:${req.ip}` })]
+    : [];
 
   router.post('/register', ...registerMiddleware, async (req: Request, res: Response) => {
     try {
@@ -40,7 +51,7 @@ export function createAuthRouter(deps: AuthRouterDeps) {
     }
   });
 
-  router.post('/login', async (req: Request, res: Response) => {
+  router.post('/login', ...loginMiddleware, async (req: Request, res: Response) => {
     try {
       const data = loginSchema.parse(req.body);
       const result = await service.loginUser(data);

@@ -1,6 +1,7 @@
 import type { UserRepo } from '../core/ports/user.repo.js';
 import type { ApiKeyRecord, ApiKeyRepo } from '../core/ports/apiKey.repo.js';
 import type { IdempotencyRecord, IdempotencyStore } from '../core/ports/idempotency.repo.js';
+import type { RateLimiter } from '../core/ports/rateLimiter.repo.js';
 import type { AdminUpdateUserInput, Role, UserListItem } from '../modules/user/user.types.js';
 
 type StoredUser = UserListItem & { passwordHash: string };
@@ -188,6 +189,35 @@ export function makeMemoryIdempotencyStore(): IdempotencyStore {
         ...record,
         expiresAt: ttlMs !== undefined ? Date.now() + ttlMs : null,
       });
+    },
+  };
+}
+
+/**
+ * In-memory fixed-window `RateLimiter`: allows up to `points` calls per `key`
+ * within each `durationMs` window. Per-process only — use a shared store
+ * (Redis, a database) to enforce one limit across multiple instances.
+ */
+export function makeMemoryRateLimiter(options: { points: number; durationMs: number }): RateLimiter {
+  const windows = new Map<string, { count: number; resetAt: number }>();
+
+  return {
+    async consume(key, cost = 1) {
+      const now = Date.now();
+      const window = windows.get(key);
+
+      if (!window || window.resetAt <= now) {
+        const resetAt = now + options.durationMs;
+        windows.set(key, { count: cost, resetAt });
+        return { allowed: cost <= options.points, remaining: Math.max(options.points - cost, 0) };
+      }
+
+      if (window.count + cost > options.points) {
+        return { allowed: false, remaining: Math.max(options.points - window.count, 0), retryAfterMs: window.resetAt - now };
+      }
+
+      window.count += cost;
+      return { allowed: true, remaining: options.points - window.count };
     },
   };
 }
