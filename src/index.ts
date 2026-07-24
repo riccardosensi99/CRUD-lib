@@ -13,6 +13,8 @@ export type {
 } from './modules/user/user.types.js';
 export { createUserRouter } from './modules/user/user.controller.js';
 export { createAuthRouter } from './modules/auth/auth.controller.js';
+export { createJwksRouter } from './modules/jwks/jwks.controller.js';
+export { getJwks, type Jwk } from './utils/jwks.js';
 export { DEFAULT_REGISTER_ROLE, resolveRegisterRole } from './modules/auth/auth.defaults.js';
 export { makeAuthService } from './modules/auth/auth.service.js';
 export {
@@ -85,6 +87,8 @@ import type { UserRepo } from './core/ports/user.repo.js';
 import type { AuthServiceDeps } from './modules/auth/auth.types.js';
 import { createAuthRouter } from './modules/auth/auth.controller.js';
 import { createUserRouter } from './modules/user/user.controller.js';
+import { createJwksRouter } from './modules/jwks/jwks.controller.js';
+import { getJwtAlgorithm } from './config/env.js';
 
 /** Options for `createLibrary`/`mountDefaultRoutes`. */
 export type LibraryConfig = {
@@ -129,6 +133,11 @@ export function createLibrary(config: LibraryConfig, deps: LibraryDeps) {
 
   router.use(`${prefix}/auth`, createAuthRouter({ userRepo: deps.userRepo, ...config.auth }));
   router.use(`${prefix}/users`, createUserRouter({ userRepo: deps.userRepo }));
+
+  // JWKS is a well-known, unprefixed path by convention, and only meaningful with RS256.
+  if (getJwtAlgorithm() === 'RS256') {
+    router.use(createJwksRouter());
+  }
 
   return { router };
 }
