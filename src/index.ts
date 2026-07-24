@@ -53,6 +53,19 @@ export {
 export { isAuth, type AuthRequest } from './middleware/isAuth.js';
 export { hasRole, isSelfOrAdmin } from './middleware/hasRole.js';
 export {
+  AppError,
+  EmailAlreadyExistsError,
+  ForbiddenError,
+  InvalidCredentialsError,
+  NotConfiguredError,
+  TokenExpiredError,
+  UserNotFoundError,
+  ValidationError,
+  errorHandler,
+  mapKnownError,
+  sendAppError,
+} from './utils/errorHandler.js';
+export {
   makePrismaEmailVerificationTokenRepo,
   makePrismaOAuthAccountRepo,
   makePrismaPasswordResetTokenRepo,

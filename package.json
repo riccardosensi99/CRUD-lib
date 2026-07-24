@@ -52,6 +52,10 @@
       "import": "./dist/middleware.js",
       "types": "./dist/middleware.d.ts"
     },
+    "./errors": {
+      "import": "./dist/errors.js",
+      "types": "./dist/errors.d.ts"
+    },
     "./adapter-prisma": {
       "import": "./dist/adapter-prisma.js",
       "types": "./dist/adapter-prisma.d.ts"
