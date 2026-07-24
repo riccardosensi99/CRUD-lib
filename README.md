@@ -453,6 +453,24 @@ Content-Type: application/json
 
 Unmatched ids are silently omitted rather than causing an error. Requires an `ADMIN` token and, like `GET /users`, is automatically scoped to the admin's `tenantId` when present. Accepts up to 100 ids per call. `UserRepo.findManyByIds` is optional on custom adapters — when absent, the service falls back to N `findById` calls, so existing adapters keep working unchanged.
 
+## Rate Limiting
+
+A pluggable `RateLimiter` port protects `POST /auth/login` and `POST /auth/register` from brute-force/abuse when provided:
+
+```ts
+import { createLibrary, createServer } from "my-crud-lib";
+import { makeMemoryRateLimiter } from "my-crud-lib/adapters/memory";
+
+const app = createServer();
+const lib = createLibrary(
+  { routesPrefix: "/api" },
+  { userRepo, rateLimiter: makeMemoryRateLimiter({ points: 5, durationMs: 60_000 }) } // 5 requests/min per IP+route
+);
+app.use(lib.router);
+```
+
+Exceeding the limit responds `429` with a `Retry-After` header. `makeMemoryRateLimiter` is fixed-window and per-process only (fine for a single instance or as a default); implement the `RateLimiter` port (`consume(key, cost?)`) against Redis or another shared store to enforce one limit across multiple instances. The `rateLimit(limiter, options?)` middleware is also exported standalone for your own routes.
+
 ## Build Checks
 
 ```bash
