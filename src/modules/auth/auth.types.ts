@@ -114,6 +114,14 @@ export type AuthServiceDeps = {
   tokenHashSecret?: string;
   idFactory?: () => string;
   now?: () => Date;
+  /** Called after a new user is created via self-registration. Errors abort registration. */
+  onUserCreated?: (user: AuthUser) => Promise<void> | void;
+  /** Called before credentials are checked during login. Throw to abort the login attempt (e.g. custom lockout logic). */
+  beforeLogin?: (input: { email: string }) => Promise<void> | void;
+  /** Called after a successful login, once tokens have been issued. Errors are not thrown to the caller. */
+  onLoginSuccess?: (user: AuthUser) => Promise<void> | void;
+  /** Called after a password reset is confirmed and the new password is saved. Errors are not thrown to the caller. */
+  onPasswordReset?: (user: AuthUser) => Promise<void> | void;
 };
 
 export type AuthUser = UserListItem;

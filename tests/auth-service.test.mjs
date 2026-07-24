@@ -78,3 +78,67 @@ test('auth service registers, logs in, refreshes, and reads me without Prisma', 
   const me = await service.getMe(registered.user.id);
   assert.equal(me?.email, 'reader@example.com');
 });
+
+test('auth service lifecycle hooks fire on register and login', async () => {
+  const { makeAuthService } = await import('../dist/modules/auth/auth.service.js');
+
+  const created = [];
+  const loginAttempts = [];
+  const loginSuccesses = [];
+
+  const service = makeAuthService({
+    userRepo: createMemoryUserRepo(),
+    passwordHashRounds: 4,
+    onUserCreated: (user) => created.push(user.email),
+    beforeLogin: ({ email }) => loginAttempts.push(email),
+    onLoginSuccess: (user) => loginSuccesses.push(user.email),
+  });
+
+  await service.registerUser({ email: 'hooked@example.com', password: 'password123' });
+  assert.deepEqual(created, ['hooked@example.com']);
+
+  await service.loginUser({ email: 'hooked@example.com', password: 'password123' });
+  assert.deepEqual(loginAttempts, ['hooked@example.com']);
+  assert.deepEqual(loginSuccesses, ['hooked@example.com']);
+
+  await assert.rejects(
+    () => service.loginUser({ email: 'hooked@example.com', password: 'wrong' }),
+    /INVALID_CREDENTIALS/,
+  );
+  assert.deepEqual(loginAttempts, ['hooked@example.com', 'hooked@example.com']);
+  assert.deepEqual(loginSuccesses, ['hooked@example.com']);
+});
+
+test('beforeLogin can abort a login attempt', async () => {
+  const { makeAuthService } = await import('../dist/modules/auth/auth.service.js');
+  const userRepo = createMemoryUserRepo();
+  const service = makeAuthService({
+    userRepo,
+    passwordHashRounds: 4,
+    beforeLogin: () => {
+      throw new Error('ACCOUNT_LOCKED');
+    },
+  });
+
+  await service.registerUser({ email: 'locked@example.com', password: 'password123' });
+
+  await assert.rejects(
+    () => service.loginUser({ email: 'locked@example.com', password: 'password123' }),
+    /ACCOUNT_LOCKED/,
+  );
+});
+
+test('onLoginSuccess errors do not fail the login', async () => {
+  const { makeAuthService } = await import('../dist/modules/auth/auth.service.js');
+  const service = makeAuthService({
+    userRepo: createMemoryUserRepo(),
+    passwordHashRounds: 4,
+    onLoginSuccess: () => {
+      throw new Error('NOTIFY_FAILED');
+    },
+  });
+
+  await service.registerUser({ email: 'resilient@example.com', password: 'password123' });
+  const loggedIn = await service.loginUser({ email: 'resilient@example.com', password: 'password123' });
+  assert.equal(loggedIn.user.email, 'resilient@example.com');
+});

@@ -49,6 +49,14 @@ function createId(deps: AuthServiceDeps): string {
   return deps.idFactory?.() ?? randomUUID();
 }
 
+async function runSideEffect(effect: () => Promise<void> | void): Promise<void> {
+  try {
+    await effect();
+  } catch (err) {
+    console.error('[my-crud-lib] lifecycle hook threw and was ignored:', err);
+  }
+}
+
 function createSecret(): string {
   return randomBytes(32).toString('base64url');
 }
@@ -161,8 +169,13 @@ export function makeAuthService(deps: AuthServiceDeps) {
     }
 
     const passwordHash = await bcrypt.hash(params.password, resolvePasswordHashRounds(deps.passwordHashRounds));
-    await userRepo.updatePassword(record.userId, passwordHash);
+    const updatedUser = await userRepo.updatePassword(record.userId, passwordHash);
     await deps.passwordResetTokenRepo.markUsed(record.id, { usedAt: now });
+
+    if (deps.onPasswordReset) {
+      const user = updatedUser ?? (await userRepo.findById(record.userId));
+      if (user) await runSideEffect(() => deps.onPasswordReset!(toAuthUser(user as UserWithMaybePasswordHash)));
+    }
 
     return { ok: true };
   }
@@ -275,10 +288,14 @@ export function makeAuthService(deps: AuthServiceDeps) {
       });
 
       const authUser = toAuthUser(user);
+      if (deps.onUserCreated) await deps.onUserCreated(authUser);
+
       return { user: authUser, ...(await issueTokens(authUser, deps)) };
     },
 
     async loginUser(params: LoginInput): Promise<AuthResult> {
+      if (deps.beforeLogin) await deps.beforeLogin({ email: params.email });
+
       const user = await userRepo.findByEmail(params.email);
       if (!user?.passwordHash) throw new Error('INVALID_CREDENTIALS');
 
@@ -286,7 +303,10 @@ export function makeAuthService(deps: AuthServiceDeps) {
       if (!ok) throw new Error('INVALID_CREDENTIALS');
 
       const authUser = toAuthUser(user);
-      return { user: authUser, ...(await issueTokens(authUser, deps)) };
+      const tokens = await issueTokens(authUser, deps);
+      if (deps.onLoginSuccess) await runSideEffect(() => deps.onLoginSuccess!(authUser));
+
+      return { user: authUser, ...tokens };
     },
 
     async refreshSession(refreshToken: string): Promise<AuthTokens> {
