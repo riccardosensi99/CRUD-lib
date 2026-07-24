@@ -325,7 +325,20 @@ Routes created by this library respond to errors with a consistent shape:
 }
 ```
 
-Validation errors additionally include a `details` array with Zod issues.
+Validation errors additionally include a `details` array of `{ field, message }`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Validation failed",
+    "details": [
+      { "field": "email", "message": "Invalid email" },
+      { "field": "password", "message": "String must contain at least 8 character(s)" }
+    ]
+  }
+}
+```
 
 The typed error classes and helpers are available for your own routes:
 
@@ -334,6 +347,7 @@ import {
   AppError,
   EmailAlreadyExistsError,
   errorHandler,
+  formatZodIssues,
   mapKnownError,
   sendAppError,
 } from "my-crud-lib/errors";
@@ -341,7 +355,8 @@ import {
 
 - `errorHandler` is an Express error-handling middleware (`app.use(errorHandler)`) for routes outside this library that call the same services/repos and `next(err)` their failures.
 - `sendAppError(res, err)` writes the same JSON shape directly from a catch block.
-- `mapKnownError(err)` normalizes any thrown value (a plain `Error`, a Zod error, or an `AppError`) into an `AppError` with a stable `code` and `statusCode`.
+- `mapKnownError(err)` normalizes any thrown value (a plain `Error`, a `ZodError`, or an `AppError`) into an `AppError` with a stable `code` and `statusCode`; Zod issues are formatted into `details` via `formatZodIssues`.
+- `formatZodIssues(issues)` flattens `ZodIssue[]` into `{ field, message }[]` directly, for use with your own Zod schemas outside this library's routes.
 
 ## Build Checks
 
