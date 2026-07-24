@@ -223,6 +223,23 @@ export interface UserRepo {
 }
 ```
 
+## In-Memory Adapter
+
+For demos, prototyping, or tests without a database:
+
+```ts
+import { createLibrary, createServer } from "my-crud-lib";
+import { makeMemoryUserRepo } from "my-crud-lib/adapters/memory";
+
+const app = createServer();
+const lib = createLibrary({ routesPrefix: "/api" }, { userRepo: makeMemoryUserRepo() });
+
+app.use(lib.router);
+app.listen(3000);
+```
+
+State lives in process memory only (lost on restart, not shared across instances). It supports the full `UserRepo` contract, including `updatePassword` and `markEmailVerified`, so password reset and email verification work when paired with in-memory token repos of your own.
+
 The Prisma adapter is available from both import paths:
 
 ```ts

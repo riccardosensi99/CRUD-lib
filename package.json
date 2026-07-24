@@ -63,6 +63,14 @@
     "./adapters/prisma": {
       "import": "./dist/adapters/prisma.js",
       "types": "./dist/adapters/prisma.d.ts"
+    },
+    "./adapter-memory": {
+      "import": "./dist/adapter-memory.js",
+      "types": "./dist/adapter-memory.d.ts"
+    },
+    "./adapters/memory": {
+      "import": "./dist/adapters/memory.js",
+      "types": "./dist/adapters/memory.d.ts"
     }
   },
   "files": [
