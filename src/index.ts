@@ -72,6 +72,7 @@ export {
   makePrismaRefreshTokenRepo,
   makePrismaUserRepo,
 } from './adapters/prisma.js';
+export { makeMemoryUserRepo } from './adapters/memory.js';
 
 import type { UserRepo } from './core/ports/user.repo.js';
 import type { AuthServiceDeps } from './modules/auth/auth.types.js';
