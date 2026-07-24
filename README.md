@@ -471,6 +471,23 @@ app.use(lib.router);
 
 Exceeding the limit responds `429` with a `Retry-After` header. `makeMemoryRateLimiter` is fixed-window and per-process only (fine for a single instance or as a default); implement the `RateLimiter` port (`consume(key, cost?)`) against Redis or another shared store to enforce one limit across multiple instances. The `rateLimit(limiter, options?)` middleware is also exported standalone for your own routes.
 
+## Correlation ID / Request Tracing
+
+`createServer()` mounts `requestId()` by default: every response carries an `X-Request-Id` header, reusing the incoming header if the caller (a gateway, another service) already sent one, or generating a UUID otherwise. Read it via `req.id` in your own routes to correlate logs, or propagate it on outbound calls to other services:
+
+```ts
+import { requestId, type RequestWithId } from "my-crud-lib/middleware";
+
+app.use(requestId({ headerName: "X-Correlation-Id" })); // custom header name, if not using createServer()
+
+app.get("/whoami", (req, res) => {
+  console.log("request", (req as RequestWithId).id);
+  res.json({ ok: true });
+});
+```
+
+To correlate a request with library-triggered side effects (e.g. [lifecycle hooks](#lifecycle-hooks)), capture `req.id` in your own route before calling into the library, and include it when logging or calling `onUserCreated`/`sendPasswordReset`/etc. from your app code.
+
 ## Build Checks
 
 ```bash
