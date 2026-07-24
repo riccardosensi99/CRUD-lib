@@ -1,6 +1,7 @@
 import express, { Router, type Express } from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+import { requestId } from './middleware/requestId.js';
 export type { UserRepo } from './core/ports/user.repo.js';
 export type {
   AdminCreateUserInput,
@@ -63,6 +64,7 @@ export { idempotent } from './middleware/idempotent.js';
 export type { IdempotencyRecord, IdempotencyStore } from './core/ports/idempotency.repo.js';
 export { rateLimit } from './middleware/rateLimit.js';
 export type { RateLimiter, RateLimitResult } from './core/ports/rateLimiter.repo.js';
+export { requestId, type RequestWithId } from './middleware/requestId.js';
 export {
   AppError,
   EmailAlreadyExistsError,
@@ -132,6 +134,7 @@ function normalizePrefix(prefix?: string): string {
 export function createServer(): Express {
   const app = express();
   app.use(cors());
+  app.use(requestId());
   app.use(bodyParser.json());
   return app;
 }
