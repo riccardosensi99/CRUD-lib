@@ -488,6 +488,21 @@ app.get("/whoami", (req, res) => {
 
 To correlate a request with library-triggered side effects (e.g. [lifecycle hooks](#lifecycle-hooks)), capture `req.id` in your own route before calling into the library, and include it when logging or calling `onUserCreated`/`sendPasswordReset`/etc. from your app code.
 
+## Health Checks
+
+`createLibrary`/`mountDefaultRoutes` mount `GET /health` and `GET /ready` (unprefixed, by convention) by default — useful for orchestrator probes (Kubernetes, ECS, etc.):
+
+- `GET /health` — liveness, always `200 { "status": "ok" }`, no dependencies checked.
+- `GET /ready` — readiness, calls `userRepo.count({})`; `200 { "status": "ok" }` if it resolves, `503 { "status": "error", "error": "..." }` if it throws (e.g. the database is unreachable).
+
+Disable them with `health: false` if your app already defines these routes:
+
+```ts
+createLibrary({ health: false }, { userRepo });
+```
+
+`createHealthRouter({ userRepo })` is also exported standalone.
+
 ## Build Checks
 
 ```bash
