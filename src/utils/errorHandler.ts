@@ -1,4 +1,18 @@
 import type { NextFunction, Request, Response } from 'express';
+import type { ZodError, ZodIssue } from 'zod';
+
+export type FieldValidationIssue = {
+  field: string;
+  message: string;
+};
+
+/** Flattens Zod issues into a stable `{ field, message }[]` shape for API responses. */
+export function formatZodIssues(issues: ZodIssue[]): FieldValidationIssue[] {
+  return issues.map((issue) => ({
+    field: issue.path.length > 0 ? issue.path.join('.') : '(root)',
+    message: issue.message,
+  }));
+}
 
 export class AppError extends Error {
   readonly code: string;
@@ -51,7 +65,7 @@ export class NotConfiguredError extends AppError {
 }
 
 export class ValidationError extends AppError {
-  constructor(details: unknown, message = 'Validation failed') {
+  constructor(details: FieldValidationIssue[], message = 'Validation failed') {
     super('VALIDATION_ERROR', message, 400, details);
   }
 }
@@ -78,7 +92,7 @@ export function mapKnownError(err: unknown): AppError {
   if (err instanceof AppError) return err;
 
   if (err && typeof err === 'object' && 'issues' in err) {
-    return new ValidationError((err as { issues: unknown }).issues);
+    return new ValidationError(formatZodIssues((err as ZodError).issues));
   }
 
   const message = err instanceof Error ? err.message : undefined;

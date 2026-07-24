@@ -62,8 +62,10 @@ export {
   UserNotFoundError,
   ValidationError,
   errorHandler,
+  formatZodIssues,
   mapKnownError,
   sendAppError,
+  type FieldValidationIssue,
 } from './utils/errorHandler.js';
 export {
   makePrismaEmailVerificationTokenRepo,
