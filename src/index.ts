@@ -15,6 +15,7 @@ export type {
 export { createUserRouter } from './modules/user/user.controller.js';
 export { createAuthRouter } from './modules/auth/auth.controller.js';
 export { createJwksRouter } from './modules/jwks/jwks.controller.js';
+export { createHealthRouter } from './modules/health/health.controller.js';
 export { getJwks, type Jwk } from './utils/jwks.js';
 export { DEFAULT_REGISTER_ROLE, resolveRegisterRole } from './modules/auth/auth.defaults.js';
 export { makeAuthService } from './modules/auth/auth.service.js';
@@ -103,6 +104,7 @@ import type { RateLimiter } from './core/ports/rateLimiter.repo.js';
 import { createAuthRouter } from './modules/auth/auth.controller.js';
 import { createUserRouter } from './modules/user/user.controller.js';
 import { createJwksRouter } from './modules/jwks/jwks.controller.js';
+import { createHealthRouter } from './modules/health/health.controller.js';
 import { getJwtAlgorithm } from './config/env.js';
 
 /** Options for `createLibrary`/`mountDefaultRoutes`. */
@@ -111,6 +113,8 @@ export type LibraryConfig = {
   routesPrefix?: string;
   /** Passed through to `createAuthRouter` alongside `deps.userRepo`. */
   auth?: Omit<AuthServiceDeps, 'userRepo'>;
+  /** Mounts `GET /health` and `GET /ready` (unprefixed). Defaults to `true`. */
+  health?: boolean;
 };
 
 /** Dependencies for `createLibrary`/`mountDefaultRoutes`. */
@@ -165,6 +169,11 @@ export function createLibrary(config: LibraryConfig, deps: LibraryDeps) {
   // JWKS is a well-known, unprefixed path by convention, and only meaningful with RS256.
   if (getJwtAlgorithm() === 'RS256') {
     router.use(createJwksRouter());
+  }
+
+  // /health and /ready are unprefixed by convention, for orchestrator probes.
+  if (config.health !== false) {
+    router.use(createHealthRouter({ userRepo: deps.userRepo }));
   }
 
   return { router };
