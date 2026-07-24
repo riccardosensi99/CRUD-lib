@@ -12,6 +12,12 @@ import {
 import { makeAuthService } from './auth.service.js';
 import type { AuthServiceDeps } from './auth.types.js';
 
+/**
+ * Builds the auth router: register, login, refresh, logout, password reset,
+ * email verification, and `GET /me`. Password reset, email verification, and
+ * OAuth linking are only active when their corresponding repo/callback deps
+ * are provided; otherwise those routes respond with `NotConfiguredError`.
+ */
 export function createAuthRouter(deps: AuthServiceDeps) {
   const router = Router();
   const service = makeAuthService(deps);

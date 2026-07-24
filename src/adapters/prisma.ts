@@ -10,6 +10,7 @@ import type { AdminUpdateUserInput, UserListItem } from '../modules/user/user.ty
 
 const dateOrNow = (value?: Date) => value ?? new Date();
 
+/** `UserRepo` implementation backed by the bundled Prisma schema (`prisma/schema.prisma`). */
 export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
   return {
     async count({ role, search }) {
@@ -181,6 +182,7 @@ export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
   };
 }
 
+/** `RefreshTokenRepo` implementation; pass it to `createAuthRouter` to enable persistent refresh token rotation/revocation. */
 export function makePrismaRefreshTokenRepo(prisma: PrismaClient): RefreshTokenRepo {
   return {
     create(input) {
@@ -210,6 +212,7 @@ export function makePrismaRefreshTokenRepo(prisma: PrismaClient): RefreshTokenRe
   };
 }
 
+/** `PasswordResetTokenRepo` implementation; pass it (with `sendPasswordReset`) to `createAuthRouter` to enable the password reset flow. */
 export function makePrismaPasswordResetTokenRepo(prisma: PrismaClient): PasswordResetTokenRepo {
   return {
     create(input) {
@@ -236,6 +239,7 @@ export function makePrismaPasswordResetTokenRepo(prisma: PrismaClient): Password
   };
 }
 
+/** `EmailVerificationTokenRepo` implementation; pass it (with `sendEmailVerification`) to `createAuthRouter` to enable the email verification flow. */
 export function makePrismaEmailVerificationTokenRepo(prisma: PrismaClient): EmailVerificationTokenRepo {
   return {
     create(input) {
@@ -262,6 +266,7 @@ export function makePrismaEmailVerificationTokenRepo(prisma: PrismaClient): Emai
   };
 }
 
+/** `OAuthAccountRepo` implementation; pass it to `createAuthRouter` to enable OAuth account linking. */
 export function makePrismaOAuthAccountRepo(prisma: PrismaClient): OAuthAccountRepo {
   return {
     findByProviderAccount(provider, providerAccountId) {
