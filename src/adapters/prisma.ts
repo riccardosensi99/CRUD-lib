@@ -76,6 +76,23 @@ export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
       }) as any;
     },
 
+    async findManyByIds(ids) {
+      const users = await prisma.user.findMany({
+        where: { id: { in: ids as any } },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          tenantId: true,
+          createdAt: true,
+          updatedAt: true,
+          profile: { select: { bio: true, avatarUrl: true } },
+        },
+      });
+      return users as unknown as UserListItem[];
+    },
+
     async findByEmail(email) {
       return prisma.user.findUnique({
         where: { email },
