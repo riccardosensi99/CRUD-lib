@@ -285,6 +285,33 @@ app.use(
 
 These dependencies are optional. Without them, the existing stateless refresh-token flow remains available and password reset, email verification, and OAuth methods report that they are not configured.
 
+## Lifecycle Hooks
+
+Optional callbacks on `AuthServiceDeps` for reacting to auth events, e.g. sending a welcome email or writing an audit log:
+
+```ts
+app.use(
+  "/auth",
+  createAuthRouter({
+    userRepo,
+    async onUserCreated(user) {
+      await emailProvider.sendWelcome(user.email);
+    },
+    async beforeLogin({ email }) {
+      await lockoutGuard.assertNotLocked(email); // throwing aborts the login attempt
+    },
+    async onLoginSuccess(user) {
+      await auditLog.record("login", user.id);
+    },
+    async onPasswordReset(user) {
+      await auditLog.record("password-reset", user.id);
+    },
+  })
+);
+```
+
+`onUserCreated` and `beforeLogin` run before the request completes — a thrown error aborts registration/login. `onLoginSuccess` and `onPasswordReset` run after the outcome is already decided; errors thrown from them are not surfaced to the caller.
+
 ## Error Responses
 
 Routes created by this library respond to errors with a consistent shape:
