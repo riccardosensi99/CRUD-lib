@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { UserRepo } from '../core/ports/user.repo.js';
 import type { ApiKeyRepo } from '../core/ports/apiKey.repo.js';
+import type { IdempotencyStore } from '../core/ports/idempotency.repo.js';
 import type {
   EmailVerificationTokenRepo,
   OAuthAccountRepo,
@@ -324,6 +325,27 @@ export function makePrismaApiKeyRepo(prisma: PrismaClient): ApiKeyRepo {
       await (prisma as any).apiKey.update({
         where: { id },
         data: { revokedAt: dateOrNow(input.revokedAt) },
+      });
+    },
+  };
+}
+
+/** `IdempotencyStore` implementation; pass it to the `idempotent` middleware to persist replayed responses across instances. */
+export function makePrismaIdempotencyStore(prisma: PrismaClient): IdempotencyStore {
+  return {
+    async get(key) {
+      const record = await (prisma as any).idempotencyKey.findUnique({ where: { key } });
+      if (!record) return null;
+      if (record.expiresAt && record.expiresAt.getTime() <= Date.now()) return null;
+      return { status: record.status, body: record.body };
+    },
+
+    async set(key, record, ttlMs) {
+      const expiresAt = ttlMs !== undefined ? new Date(Date.now() + ttlMs) : null;
+      await (prisma as any).idempotencyKey.upsert({
+        where: { key },
+        create: { key, status: record.status, body: record.body as any, expiresAt },
+        update: { status: record.status, body: record.body as any, expiresAt },
       });
     },
   };

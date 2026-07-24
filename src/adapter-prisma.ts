@@ -1,6 +1,7 @@
 export {
   makePrismaApiKeyRepo,
   makePrismaEmailVerificationTokenRepo,
+  makePrismaIdempotencyStore,
   makePrismaOAuthAccountRepo,
   makePrismaPasswordResetTokenRepo,
   makePrismaRefreshTokenRepo,

@@ -58,6 +58,8 @@ export { requireTenant, isSameTenant } from './middleware/tenant.js';
 export { isApiKey, type ApiKeyRequest } from './middleware/isApiKey.js';
 export type { ApiKeyRecord, ApiKeyRepo } from './core/ports/apiKey.repo.js';
 export { issueApiKey, verifyApiKey } from './utils/apiKey.js';
+export { idempotent } from './middleware/idempotent.js';
+export type { IdempotencyRecord, IdempotencyStore } from './core/ports/idempotency.repo.js';
 export {
   AppError,
   EmailAlreadyExistsError,
@@ -76,15 +78,17 @@ export {
 export {
   makePrismaApiKeyRepo,
   makePrismaEmailVerificationTokenRepo,
+  makePrismaIdempotencyStore,
   makePrismaOAuthAccountRepo,
   makePrismaPasswordResetTokenRepo,
   makePrismaRefreshTokenRepo,
   makePrismaUserRepo,
 } from './adapters/prisma.js';
-export { makeMemoryApiKeyRepo, makeMemoryUserRepo } from './adapters/memory.js';
+export { makeMemoryApiKeyRepo, makeMemoryIdempotencyStore, makeMemoryUserRepo } from './adapters/memory.js';
 
 import type { UserRepo } from './core/ports/user.repo.js';
 import type { AuthServiceDeps } from './modules/auth/auth.types.js';
+import type { IdempotencyStore } from './core/ports/idempotency.repo.js';
 import { createAuthRouter } from './modules/auth/auth.controller.js';
 import { createUserRouter } from './modules/user/user.controller.js';
 import { createJwksRouter } from './modules/jwks/jwks.controller.js';
@@ -101,6 +105,8 @@ export type LibraryConfig = {
 /** Dependencies for `createLibrary`/`mountDefaultRoutes`. */
 export type LibraryDeps = {
   userRepo: UserRepo;
+  /** Enables `Idempotency-Key` support on `POST /auth/register` and `POST /users`. */
+  idempotencyStore?: IdempotencyStore;
 };
 
 function normalizePrefix(prefix?: string): string {
@@ -131,8 +137,11 @@ export function createLibrary(config: LibraryConfig, deps: LibraryDeps) {
   const router = Router();
   const prefix = normalizePrefix(config.routesPrefix);
 
-  router.use(`${prefix}/auth`, createAuthRouter({ userRepo: deps.userRepo, ...config.auth }));
-  router.use(`${prefix}/users`, createUserRouter({ userRepo: deps.userRepo }));
+  router.use(
+    `${prefix}/auth`,
+    createAuthRouter({ userRepo: deps.userRepo, idempotencyStore: deps.idempotencyStore, ...config.auth }),
+  );
+  router.use(`${prefix}/users`, createUserRouter({ userRepo: deps.userRepo, idempotencyStore: deps.idempotencyStore }));
 
   // JWKS is a well-known, unprefixed path by convention, and only meaningful with RS256.
   if (getJwtAlgorithm() === 'RS256') {

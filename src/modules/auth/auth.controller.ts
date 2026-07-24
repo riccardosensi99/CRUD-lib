@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import { isAuth, type AuthRequest } from '../../middleware/isAuth.js';
+import { idempotent } from '../../middleware/idempotent.js';
 import { sendAppError } from '../../utils/errorHandler.js';
+import type { IdempotencyStore } from '../../core/ports/idempotency.repo.js';
 import {
   emailVerificationConfirmSchema,
   emailVerificationRequestSchema,
@@ -12,17 +14,23 @@ import {
 import { makeAuthService } from './auth.service.js';
 import type { AuthServiceDeps } from './auth.types.js';
 
+export type AuthRouterDeps = AuthServiceDeps & {
+  /** Enables `Idempotency-Key` support on `POST /register` when provided. */
+  idempotencyStore?: IdempotencyStore;
+};
+
 /**
  * Builds the auth router: register, login, refresh, logout, password reset,
  * email verification, and `GET /me`. Password reset, email verification, and
  * OAuth linking are only active when their corresponding repo/callback deps
  * are provided; otherwise those routes respond with `NotConfiguredError`.
  */
-export function createAuthRouter(deps: AuthServiceDeps) {
+export function createAuthRouter(deps: AuthRouterDeps) {
   const router = Router();
   const service = makeAuthService(deps);
+  const registerMiddleware = deps.idempotencyStore ? [idempotent(deps.idempotencyStore)] : [];
 
-  router.post('/register', async (req: Request, res: Response) => {
+  router.post('/register', ...registerMiddleware, async (req: Request, res: Response) => {
     try {
       const data = registerSchema.parse(req.body);
       const result = await service.registerUser(data);

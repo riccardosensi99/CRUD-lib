@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { isAuth, type AuthRequest } from '../../middleware/isAuth.js';
 import { hasRole, isSelfOrAdmin } from '../../middleware/hasRole.js';
+import { idempotent } from '../../middleware/idempotent.js';
 import { ForbiddenError, sendAppError } from '../../utils/errorHandler.js';
 import {
   listUsersQuerySchema,
@@ -10,15 +11,23 @@ import {
 } from './user.schemas.js';
 import { makeUserService } from './user.service.js';
 import type { UserRepo } from '../../core/ports/user.repo.js';
+import type { IdempotencyStore } from '../../core/ports/idempotency.repo.js';
+
+export type UserRouterDeps = {
+  userRepo: UserRepo;
+  /** Enables `Idempotency-Key` support on `POST /` (admin create) when provided. */
+  idempotencyStore?: IdempotencyStore;
+};
 
 /**
  * Builds the user CRUD router: admin list/create/update/delete plus
  * `GET/PUT /me` for the authenticated user. Admin routes require an
  * `ADMIN` bearer token; `/:id` routes allow the resource owner or an admin.
  */
-export function createUserRouter(deps: { userRepo: UserRepo }) {
+export function createUserRouter(deps: UserRouterDeps) {
   const router = Router();
   const service = makeUserService({ userRepo: deps.userRepo });
+  const createMiddleware = deps.idempotencyStore ? [idempotent(deps.idempotencyStore)] : [];
 
   router.get('/', isAuth, hasRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
@@ -48,7 +57,7 @@ export function createUserRouter(deps: { userRepo: UserRepo }) {
     }
   });
 
-  router.post('/', isAuth, hasRole('ADMIN'), async (req, res) => {
+  router.post('/', isAuth, hasRole('ADMIN'), ...createMiddleware, async (req, res) => {
     try {
       const body = adminCreateUserSchema.parse(req.body);
       const data = await service.adminCreateUser(body);
