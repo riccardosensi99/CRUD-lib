@@ -1,0 +1,15 @@
+export {
+  AppError,
+  EmailAlreadyExistsError,
+  ForbiddenError,
+  InvalidCredentialsError,
+  NotConfiguredError,
+  TokenExpiredError,
+  UserNotFoundError,
+  ValidationError,
+  errorHandler,
+  formatZodIssues,
+  mapKnownError,
+  sendAppError,
+  type FieldValidationIssue,
+} from './utils/errorHandler.js';

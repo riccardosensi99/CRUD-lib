@@ -4,7 +4,22 @@ All notable changes to `my-crud-lib` are documented here.
 
 This project follows semantic versioning. Breaking changes are called out explicitly and should be reviewed before upgrading.
 
-## 2.1.0 - Unreleased
+## 3.0.0 - Unreleased
+
+### Breaking Changes
+
+- Error responses from the auth and user routers now use `{ "error": { "code", "message", "details"? } }` instead of `{ "error": "<string>" }`. HTTP status codes are unchanged. Validation error `details` are now a formatted `{ field, message }[]` array instead of raw Zod issues.
+
+### Added
+
+- Added a CLI scaffolding command (`npx my-crud-lib init`) that generates a starter Prisma schema, `.env`, and Express server.
+- Added typed error classes (`AppError`, `EmailAlreadyExistsError`, `InvalidCredentialsError`, `UserNotFoundError`, `TokenExpiredError`, `ForbiddenError`, `NotConfiguredError`, `ValidationError`) and `mapKnownError`/`sendAppError`/`errorHandler` helpers, exported from `my-crud-lib` and a new `my-crud-lib/errors` entry point.
+- Added `formatZodIssues` to flatten Zod issues into `{ field, message }[]`, used for `ValidationError` details.
+- Added an official dependency-free in-memory `UserRepo` adapter (`makeMemoryUserRepo`), exported from `my-crud-lib`, `my-crud-lib/adapters/memory`, and `my-crud-lib/adapter-memory`.
+- Added optional auth lifecycle hooks (`onUserCreated`, `beforeLogin`, `onLoginSuccess`, `onPasswordReset`) on `AuthServiceDeps`.
+- Added JSDoc to the public API surface for IDE hover/autocomplete hints.
+
+## 2.1.0 - 2026-05-14
 
 ### Added
 

@@ -45,6 +45,16 @@ BCRYPT_SALT="10"
 
 `JWT_ACCESS_EXPIRES_IN` and `JWT_REFRESH_EXPIRES_IN` have defaults. `JWT_SECRET` and `DATABASE_URL` must be set before using the default auth and Prisma paths.
 
+## CLI Scaffolding
+
+Generate a starter Prisma schema, `.env`, and Express server in the current directory:
+
+```bash
+npx my-crud-lib init
+```
+
+This creates `prisma/schema.prisma`, `src/server.ts`, and `.env` (skipping any that already exist). Edit `.env` with your `DATABASE_URL` and `JWT_SECRET`, then follow the printed next steps to install dependencies and run the server.
+
 ## Quickstart With Express And Prisma
 
 ```ts
@@ -213,6 +223,23 @@ export interface UserRepo {
 }
 ```
 
+## In-Memory Adapter
+
+For demos, prototyping, or tests without a database:
+
+```ts
+import { createLibrary, createServer } from "my-crud-lib";
+import { makeMemoryUserRepo } from "my-crud-lib/adapters/memory";
+
+const app = createServer();
+const lib = createLibrary({ routesPrefix: "/api" }, { userRepo: makeMemoryUserRepo() });
+
+app.use(lib.router);
+app.listen(3000);
+```
+
+State lives in process memory only (lost on restart, not shared across instances). It supports the full `UserRepo` contract, including `updatePassword` and `markEmailVerified`, so password reset and email verification work when paired with in-memory token repos of your own.
+
 The Prisma adapter is available from both import paths:
 
 ```ts
@@ -257,6 +284,79 @@ app.use(
 ```
 
 These dependencies are optional. Without them, the existing stateless refresh-token flow remains available and password reset, email verification, and OAuth methods report that they are not configured.
+
+## Lifecycle Hooks
+
+Optional callbacks on `AuthServiceDeps` for reacting to auth events, e.g. sending a welcome email or writing an audit log:
+
+```ts
+app.use(
+  "/auth",
+  createAuthRouter({
+    userRepo,
+    async onUserCreated(user) {
+      await emailProvider.sendWelcome(user.email);
+    },
+    async beforeLogin({ email }) {
+      await lockoutGuard.assertNotLocked(email); // throwing aborts the login attempt
+    },
+    async onLoginSuccess(user) {
+      await auditLog.record("login", user.id);
+    },
+    async onPasswordReset(user) {
+      await auditLog.record("password-reset", user.id);
+    },
+  })
+);
+```
+
+`onUserCreated` and `beforeLogin` run before the request completes — a thrown error aborts registration/login. `onLoginSuccess` and `onPasswordReset` run after the outcome is already decided; errors thrown from them are not surfaced to the caller.
+
+## Error Responses
+
+Routes created by this library respond to errors with a consistent shape:
+
+```json
+{
+  "error": {
+    "code": "INVALID_CREDENTIALS",
+    "message": "Invalid credentials"
+  }
+}
+```
+
+Validation errors additionally include a `details` array of `{ field, message }`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Validation failed",
+    "details": [
+      { "field": "email", "message": "Invalid email" },
+      { "field": "password", "message": "String must contain at least 8 character(s)" }
+    ]
+  }
+}
+```
+
+The typed error classes and helpers are available for your own routes:
+
+```ts
+import {
+  AppError,
+  EmailAlreadyExistsError,
+  errorHandler,
+  formatZodIssues,
+  mapKnownError,
+  sendAppError,
+} from "my-crud-lib/errors";
+```
+
+- `errorHandler` is an Express error-handling middleware (`app.use(errorHandler)`) for routes outside this library that call the same services/repos and `next(err)` their failures.
+- `sendAppError(res, err)` writes the same JSON shape directly from a catch block.
+- `mapKnownError(err)` normalizes any thrown value (a plain `Error`, a `ZodError`, or an `AppError`) into an `AppError` with a stable `code` and `statusCode`; Zod issues are formatted into `details` via `formatZodIssues`.
+- `formatZodIssues(issues)` flattens `ZodIssue[]` into `{ field, message }[]` directly, for use with your own Zod schemas outside this library's routes.
 
 ## Build Checks
 

@@ -1,6 +1,6 @@
 {
   "name": "my-crud-lib",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "description": "TypeScript auth and user/profile CRUD helpers for Express with Prisma and custom repository adapters",
   "license": "MIT",
   "author": "Riccardo Sensi",
@@ -8,6 +8,9 @@
   "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "my-crud-lib": "bin/init.mjs"
+  },
   "keywords": [
     "auth",
     "authentication",
@@ -49,6 +52,10 @@
       "import": "./dist/middleware.js",
       "types": "./dist/middleware.d.ts"
     },
+    "./errors": {
+      "import": "./dist/errors.js",
+      "types": "./dist/errors.d.ts"
+    },
     "./adapter-prisma": {
       "import": "./dist/adapter-prisma.js",
       "types": "./dist/adapter-prisma.d.ts"
@@ -56,12 +63,22 @@
     "./adapters/prisma": {
       "import": "./dist/adapters/prisma.js",
       "types": "./dist/adapters/prisma.d.ts"
+    },
+    "./adapter-memory": {
+      "import": "./dist/adapter-memory.js",
+      "types": "./dist/adapter-memory.d.ts"
+    },
+    "./adapters/memory": {
+      "import": "./dist/adapters/memory.js",
+      "types": "./dist/adapters/memory.d.ts"
     }
   },
   "files": [
     "dist",
     "docs",
     "examples",
+    "bin",
+    "templates",
     "CHANGELOG.md",
     "README.md",
     "RELEASE.md",

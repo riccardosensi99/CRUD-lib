@@ -53,23 +53,43 @@ export {
 export { isAuth, type AuthRequest } from './middleware/isAuth.js';
 export { hasRole, isSelfOrAdmin } from './middleware/hasRole.js';
 export {
+  AppError,
+  EmailAlreadyExistsError,
+  ForbiddenError,
+  InvalidCredentialsError,
+  NotConfiguredError,
+  TokenExpiredError,
+  UserNotFoundError,
+  ValidationError,
+  errorHandler,
+  formatZodIssues,
+  mapKnownError,
+  sendAppError,
+  type FieldValidationIssue,
+} from './utils/errorHandler.js';
+export {
   makePrismaEmailVerificationTokenRepo,
   makePrismaOAuthAccountRepo,
   makePrismaPasswordResetTokenRepo,
   makePrismaRefreshTokenRepo,
   makePrismaUserRepo,
 } from './adapters/prisma.js';
+export { makeMemoryUserRepo } from './adapters/memory.js';
 
 import type { UserRepo } from './core/ports/user.repo.js';
 import type { AuthServiceDeps } from './modules/auth/auth.types.js';
 import { createAuthRouter } from './modules/auth/auth.controller.js';
 import { createUserRouter } from './modules/user/user.controller.js';
 
+/** Options for `createLibrary`/`mountDefaultRoutes`. */
 export type LibraryConfig = {
+  /** Prefix applied to all mounted routes, e.g. `/api`. */
   routesPrefix?: string;
+  /** Passed through to `createAuthRouter` alongside `deps.userRepo`. */
   auth?: Omit<AuthServiceDeps, 'userRepo'>;
 };
 
+/** Dependencies for `createLibrary`/`mountDefaultRoutes`. */
 export type LibraryDeps = {
   userRepo: UserRepo;
 };
@@ -82,6 +102,7 @@ function normalizePrefix(prefix?: string): string {
   return withLeadingSlash.endsWith('/') ? withLeadingSlash.slice(0, -1) : withLeadingSlash;
 }
 
+/** Creates an Express app with `cors` and JSON body parsing already wired in. */
 export function createServer(): Express {
   const app = express();
   app.use(cors());
@@ -89,6 +110,14 @@ export function createServer(): Express {
   return app;
 }
 
+/**
+ * Builds the combined auth + user router for this library.
+ *
+ * @param config.routesPrefix - Path prefix for all mounted routes, e.g. `/api`. Defaults to no prefix.
+ * @param config.auth - Extra `AuthServiceDeps` (excluding `userRepo`), e.g. `passwordHashRounds` or optional token repos.
+ * @param deps.userRepo - The `UserRepo` adapter backing both auth and user CRUD.
+ * @returns `{ router }` — mount it with `app.use(router)`.
+ */
 export function createLibrary(config: LibraryConfig, deps: LibraryDeps) {
   const router = Router();
   const prefix = normalizePrefix(config.routesPrefix);
@@ -99,6 +128,7 @@ export function createLibrary(config: LibraryConfig, deps: LibraryDeps) {
   return { router };
 }
 
+/** Convenience wrapper that builds the router via `createLibrary` and mounts it on `app` directly. */
 export function mountDefaultRoutes(app: Express, deps: LibraryDeps, config: LibraryConfig = {}) {
   const { router } = createLibrary(config, deps);
   app.use(router);
