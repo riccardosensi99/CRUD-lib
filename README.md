@@ -508,6 +508,7 @@ createLibrary({ health: false }, { userRepo });
 ```bash
 npm run build
 npm test
+npm run test:api
 npm run smoke:exports
 npm run smoke:auth-hardening
 npm run smoke:auth-service
@@ -516,6 +517,7 @@ npm run smoke:auth-service
 `smoke:exports` builds the package and imports the documented public paths from `dist`.
 `smoke:auth-hardening` checks auth safety defaults and JWT secret validation.
 `smoke:auth-service` verifies register/login/refresh/me with an in-memory repo.
+`test:api` runs the Jest + Supertest end-to-end API suite (`tests/api/`) against a real HTTP server backed by the in-memory adapter, covering every route mounted by `createLibrary` — success paths, validation (400), auth (401), permissions (403), not found (404), and conflicts (409). It runs automatically in CI on every pull request.
 
 ## Current Limitations
 
