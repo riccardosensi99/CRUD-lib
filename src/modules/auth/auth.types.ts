@@ -122,6 +122,15 @@ export type AuthServiceDeps = {
   onLoginSuccess?: (user: AuthUser) => Promise<void> | void;
   /** Called after a password reset is confirmed and the new password is saved. Errors are not thrown to the caller. */
   onPasswordReset?: (user: AuthUser) => Promise<void> | void;
+  /**
+   * Allows an anonymous caller of `POST /register` to set their own `tenantId`.
+   * Defaults to `false`: self-registration is unauthenticated, so accepting a
+   * client-supplied tenant id would let anyone join any tenant by guessing or
+   * copying its id. Leave this off and assign `tenantId` server-side instead
+   * (e.g. from a verified invite token) unless you have your own way to
+   * authorize which tenant a new registrant may join.
+   */
+  allowTenantIdOnRegister?: boolean;
 };
 
 export type AuthUser = UserListItem;

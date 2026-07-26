@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { IdempotencyStore } from '../core/ports/idempotency.repo.js';
+import { sendAppError } from '../utils/errorHandler.js';
 
 /**
  * Replays a stored response for repeated requests carrying the same
@@ -16,7 +17,13 @@ export function idempotent(store: IdempotencyStore, options?: { headerName?: str
     const key = Array.isArray(raw) ? raw[0] : raw;
     if (!key) return next();
 
-    const existing = await store.get(key);
+    let existing;
+    try {
+      existing = await store.get(key);
+    } catch (err) {
+      return sendAppError(res, err);
+    }
+
     if (existing) {
       res.setHeader('Idempotent-Replay', 'true');
       return res.status(existing.status).json(existing.body);

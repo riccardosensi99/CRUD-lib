@@ -373,7 +373,8 @@ app.get("/internal/reports", isAuth, requireTenant(), handler);
 ```
 
 Behavior:
-- `POST /auth/register` and `POST /users` accept an optional `tenantId`.
+- `POST /users` (admin-only) accepts an optional `tenantId`. `makeAuthService(...).registerUser()` also accepts one directly, for trusted server-side calls (e.g. your own invite-acceptance endpoint that already verified which tenant to join).
+- `POST /auth/register` is anonymous, so it **ignores** any `tenantId` in the request body by default — accepting one from an unauthenticated caller would let anyone join any tenant by guessing or copying its id. Opt in explicitly with `allowTenantIdOnRegister: true` only if your app has its own way to authorize which tenant a new registrant may join.
 - Access/refresh tokens carry `tenantId` when the user has one; `isAuth` exposes it as `req.user.tenantId`.
 - Admin `GET /users` is automatically scoped to `req.user.tenantId` when the admin's token carries one — an admin token scoped to a tenant can never list another tenant's users.
 - `GET/PUT/DELETE /users/:id` respond `404` (not `403`, to avoid leaking existence) when the target user belongs to a different tenant.
@@ -381,6 +382,8 @@ Behavior:
 - `isSameTenant(getResourceTenantId?)` middleware compares `req.user.tenantId` against a resolved resource tenant id (defaults to `req.params.tenantId`), for your own routes.
 
 Single-tenant apps are unaffected: omit `tenantId` everywhere and behavior is identical to before.
+
+**Security note:** any route that trusts `req.user.tenantId` to authorize access to tenant-scoped resources is only as safe as how tenant membership is granted. Prefer assigning `tenantId` from a trusted, server-side source (an invite token, an admin action) over letting it flow from unauthenticated user input.
 
 ## API Keys (Machine-to-Machine Auth)
 
@@ -434,6 +437,8 @@ app.use(lib.router);
 ```
 
 Send `Idempotency-Key: <uuid>` on the request. The first call runs normally and its response is stored; any repeat with the same key returns the exact same response (marked with an `Idempotent-Replay: true` header) without re-executing the handler. Requests without the header are unaffected — idempotency is opt-in per call. The `idempotent(store, options?)` middleware is also exported standalone for use on your own routes.
+
+`makePrismaIdempotencyStore` evicts an expired record the next time it's read with the same key, but keys that are set once and never re-read are not cleaned up automatically — schedule a periodic `DELETE FROM "IdempotencyKey" WHERE "expiresAt" < now()` (or equivalent) if you expect high key churn.
 
 ## Bulk User Lookup
 

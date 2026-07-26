@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { ApiKeyRepo } from '../core/ports/apiKey.repo.js';
 import { verifyApiKey } from '../utils/apiKey.js';
+import { sendAppError } from '../utils/errorHandler.js';
 
 export type ApiKeyRequest = Request & {
   apiKey?: { id: string; name?: string | null; scopes: string[]; tenantId?: string | number };
@@ -29,7 +30,13 @@ export function isApiKey(apiKeyRepo: ApiKeyRepo, options?: { requiredScopes?: st
     }
 
     const [id] = key.split('.');
-    const record = id ? await apiKeyRepo.findById(id) : null;
+    let record;
+    try {
+      record = id ? await apiKeyRepo.findById(id) : null;
+    } catch (err) {
+      return sendAppError(res, err);
+    }
+
     if (!record || record.revokedAt || !verifyApiKey(key, record)) {
       return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Invalid or revoked API key' } });
     }

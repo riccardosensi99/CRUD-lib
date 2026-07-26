@@ -66,3 +66,20 @@ test('isApiKey enforces requiredScopes', async () => {
   );
   assert.equal(res.statusCode, 403);
 });
+
+test('isApiKey responds 500 instead of hanging when the repo throws', async () => {
+  const { isApiKey } = await import('../dist/middleware/isApiKey.js');
+
+  const brokenRepo = {
+    async findById() { throw new Error('REPO_DOWN'); },
+    async create() {},
+    async revoke() {},
+  };
+  const middleware = isApiKey(brokenRepo);
+
+  const res = makeRes();
+  await middleware({ headers: { 'x-api-key': 'id.secret' } }, res, () => assert.fail('should not call next'));
+
+  assert.equal(res.statusCode, 500);
+  assert.equal(res.body.error.code, 'INTERNAL_ERROR');
+});

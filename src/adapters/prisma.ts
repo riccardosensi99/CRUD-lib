@@ -353,7 +353,13 @@ export function makePrismaIdempotencyStore(prisma: PrismaClient): IdempotencySto
     async get(key) {
       const record = await (prisma as any).idempotencyKey.findUnique({ where: { key } });
       if (!record) return null;
-      if (record.expiresAt && record.expiresAt.getTime() <= Date.now()) return null;
+      if (record.expiresAt && record.expiresAt.getTime() <= Date.now()) {
+        // Lazily evict on read, same as the in-memory adapter. This alone doesn't
+        // bound table growth for keys that are set once and never re-read with
+        // the same key — schedule a periodic DELETE WHERE expiresAt < now() too.
+        await (prisma as any).idempotencyKey.delete({ where: { key } }).catch(() => {});
+        return null;
+      }
       return { status: record.status, body: record.body };
     },
 

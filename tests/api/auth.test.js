@@ -34,6 +34,22 @@ describe('POST /api/auth/register', () => {
     const fields = res.body.error.details.map((d) => d.field);
     expect(fields).toEqual(expect.arrayContaining(['email', 'password']));
   });
+
+  it('ignores a client-supplied tenantId by default (anonymous self-registration cannot join a tenant)', async () => {
+    const { app } = buildApp();
+    const res = await registerUser(request, app, { tenantId: 'someone-elses-tenant' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.user.tenantId).toBeFalsy();
+  });
+
+  it('honors a client-supplied tenantId only when allowTenantIdOnRegister is enabled', async () => {
+    const { app } = buildApp({ auth: { allowTenantIdOnRegister: true } });
+    const res = await registerUser(request, app, { tenantId: 'tenant-a' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.user.tenantId).toBe('tenant-a');
+  });
 });
 
 describe('POST /api/auth/login', () => {

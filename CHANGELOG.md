@@ -4,7 +4,27 @@ All notable changes to `my-crud-lib` are documented here.
 
 This project follows semantic versioning. Breaking changes are called out explicitly and should be reviewed before upgrading.
 
-## 3.0.0 - Unreleased
+## 3.1.0 - Unreleased
+
+### Added
+
+- Added optional multi-tenancy: `tenantId` on `UserRepo`, `UserListItem`, and JWT payloads; `req.user.tenantId` via `isAuth`; admin `GET /users` and `GET/PUT/DELETE /users/:id` are automatically tenant-scoped; new `requireTenant()`/`isSameTenant()` middleware.
+- Added machine-to-machine API key authentication: `ApiKeyRepo` port, `issueApiKey`/`verifyApiKey` helpers, `isApiKey` middleware, and `makeMemoryApiKeyRepo`/`makePrismaApiKeyRepo` adapters.
+- Added optional RS256/JWKS support (`JWT_ALG=RS256`, `JWT_PRIVATE_KEY`/`JWT_PUBLIC_KEY`/`JWT_KEY_ID`) with an auto-mounted `GET /.well-known/jwks.json`, so other services can verify tokens without a shared secret.
+- Added idempotency key support (`IdempotencyStore` port, `idempotent` middleware) on `POST /auth/register` and admin `POST /users`, with memory and Prisma adapters.
+- Added bulk user lookup: optional `UserRepo.findManyByIds`, and `POST /users/batch`.
+- Added a pluggable rate limiter (`RateLimiter` port, `rateLimit` middleware, `makeMemoryRateLimiter`) applied to `POST /auth/login` and `POST /auth/register` when configured.
+- Added a correlation id / request tracing middleware (`requestId`), mounted by default in `createServer()`.
+- Added health check endpoints (`GET /health`, `GET /ready`), mounted by default in `createLibrary`/`mountDefaultRoutes`.
+- Added a Jest + Supertest end-to-end API test suite (`tests/api/`), run in CI on every pull request alongside the existing `node:test` suite.
+
+### Security
+
+- `POST /auth/register` now ignores any client-supplied `tenantId` by default, since self-registration is unauthenticated and accepting one would let anyone join any tenant by guessing or copying its id. Opt in with `allowTenantIdOnRegister: true` only if your app has its own way to authorize tenant membership. Server-side calls to `makeAuthService(...).registerUser()` are unaffected and can still set `tenantId` directly.
+- `idempotent`, `rateLimit`, and `isApiKey` middleware now catch errors from their underlying store/repo and respond with a normal error instead of leaving the request hanging if the backing store (e.g. a Prisma- or Redis-backed adapter) throws.
+- `makePrismaIdempotencyStore` now evicts an expired record the next time it's read with the same key (previously it never deleted expired rows).
+
+## 3.0.0 - 2026-07-24
 
 ### Breaking Changes
 
