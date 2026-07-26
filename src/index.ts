@@ -1,6 +1,7 @@
 import express, { Router, type Express } from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+import { requestId } from './middleware/requestId.js';
 export type { UserRepo } from './core/ports/user.repo.js';
 export type {
   AdminCreateUserInput,
@@ -13,6 +14,9 @@ export type {
 } from './modules/user/user.types.js';
 export { createUserRouter } from './modules/user/user.controller.js';
 export { createAuthRouter } from './modules/auth/auth.controller.js';
+export { createJwksRouter } from './modules/jwks/jwks.controller.js';
+export { createHealthRouter } from './modules/health/health.controller.js';
+export { getJwks, type Jwk } from './utils/jwks.js';
 export { DEFAULT_REGISTER_ROLE, resolveRegisterRole } from './modules/auth/auth.defaults.js';
 export { makeAuthService } from './modules/auth/auth.service.js';
 export {
@@ -49,9 +53,19 @@ export {
   adminUpdateUserSchema,
   listUsersQuerySchema,
   updateMeSchema,
+  userIdsBatchSchema,
 } from './modules/user/user.schemas.js';
 export { isAuth, type AuthRequest } from './middleware/isAuth.js';
 export { hasRole, isSelfOrAdmin } from './middleware/hasRole.js';
+export { requireTenant, isSameTenant } from './middleware/tenant.js';
+export { isApiKey, type ApiKeyRequest } from './middleware/isApiKey.js';
+export type { ApiKeyRecord, ApiKeyRepo } from './core/ports/apiKey.repo.js';
+export { issueApiKey, verifyApiKey } from './utils/apiKey.js';
+export { idempotent } from './middleware/idempotent.js';
+export type { IdempotencyRecord, IdempotencyStore } from './core/ports/idempotency.repo.js';
+export { rateLimit } from './middleware/rateLimit.js';
+export type { RateLimiter, RateLimitResult } from './core/ports/rateLimiter.repo.js';
+export { requestId, type RequestWithId } from './middleware/requestId.js';
 export {
   AppError,
   EmailAlreadyExistsError,
@@ -68,18 +82,30 @@ export {
   type FieldValidationIssue,
 } from './utils/errorHandler.js';
 export {
+  makePrismaApiKeyRepo,
   makePrismaEmailVerificationTokenRepo,
+  makePrismaIdempotencyStore,
   makePrismaOAuthAccountRepo,
   makePrismaPasswordResetTokenRepo,
   makePrismaRefreshTokenRepo,
   makePrismaUserRepo,
 } from './adapters/prisma.js';
-export { makeMemoryUserRepo } from './adapters/memory.js';
+export {
+  makeMemoryApiKeyRepo,
+  makeMemoryIdempotencyStore,
+  makeMemoryRateLimiter,
+  makeMemoryUserRepo,
+} from './adapters/memory.js';
 
 import type { UserRepo } from './core/ports/user.repo.js';
 import type { AuthServiceDeps } from './modules/auth/auth.types.js';
+import type { IdempotencyStore } from './core/ports/idempotency.repo.js';
+import type { RateLimiter } from './core/ports/rateLimiter.repo.js';
 import { createAuthRouter } from './modules/auth/auth.controller.js';
 import { createUserRouter } from './modules/user/user.controller.js';
+import { createJwksRouter } from './modules/jwks/jwks.controller.js';
+import { createHealthRouter } from './modules/health/health.controller.js';
+import { getJwtAlgorithm } from './config/env.js';
 
 /** Options for `createLibrary`/`mountDefaultRoutes`. */
 export type LibraryConfig = {
@@ -87,11 +113,17 @@ export type LibraryConfig = {
   routesPrefix?: string;
   /** Passed through to `createAuthRouter` alongside `deps.userRepo`. */
   auth?: Omit<AuthServiceDeps, 'userRepo'>;
+  /** Mounts `GET /health` and `GET /ready` (unprefixed). Defaults to `true`. */
+  health?: boolean;
 };
 
 /** Dependencies for `createLibrary`/`mountDefaultRoutes`. */
 export type LibraryDeps = {
   userRepo: UserRepo;
+  /** Enables `Idempotency-Key` support on `POST /auth/register` and `POST /users`. */
+  idempotencyStore?: IdempotencyStore;
+  /** Enables rate limiting on `POST /auth/login` and `POST /auth/register`. */
+  rateLimiter?: RateLimiter;
 };
 
 function normalizePrefix(prefix?: string): string {
@@ -106,6 +138,7 @@ function normalizePrefix(prefix?: string): string {
 export function createServer(): Express {
   const app = express();
   app.use(cors());
+  app.use(requestId());
   app.use(bodyParser.json());
   return app;
 }
@@ -122,8 +155,26 @@ export function createLibrary(config: LibraryConfig, deps: LibraryDeps) {
   const router = Router();
   const prefix = normalizePrefix(config.routesPrefix);
 
-  router.use(`${prefix}/auth`, createAuthRouter({ userRepo: deps.userRepo, ...config.auth }));
-  router.use(`${prefix}/users`, createUserRouter({ userRepo: deps.userRepo }));
+  router.use(
+    `${prefix}/auth`,
+    createAuthRouter({
+      userRepo: deps.userRepo,
+      idempotencyStore: deps.idempotencyStore,
+      rateLimiter: deps.rateLimiter,
+      ...config.auth,
+    }),
+  );
+  router.use(`${prefix}/users`, createUserRouter({ userRepo: deps.userRepo, idempotencyStore: deps.idempotencyStore }));
+
+  // JWKS is a well-known, unprefixed path by convention, and only meaningful with RS256.
+  if (getJwtAlgorithm() === 'RS256') {
+    router.use(createJwksRouter());
+  }
+
+  // /health and /ready are unprefixed by convention, for orchestrator probes.
+  if (config.health !== false) {
+    router.use(createHealthRouter({ userRepo: deps.userRepo }));
+  }
 
   return { router };
 }

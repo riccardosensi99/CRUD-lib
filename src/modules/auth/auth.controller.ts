@@ -1,6 +1,10 @@
 import { Router, type Request, type Response } from 'express';
 import { isAuth, type AuthRequest } from '../../middleware/isAuth.js';
+import { idempotent } from '../../middleware/idempotent.js';
+import { rateLimit } from '../../middleware/rateLimit.js';
 import { sendAppError } from '../../utils/errorHandler.js';
+import type { IdempotencyStore } from '../../core/ports/idempotency.repo.js';
+import type { RateLimiter } from '../../core/ports/rateLimiter.repo.js';
 import {
   emailVerificationConfirmSchema,
   emailVerificationRequestSchema,
@@ -12,27 +16,45 @@ import {
 import { makeAuthService } from './auth.service.js';
 import type { AuthServiceDeps } from './auth.types.js';
 
+export type AuthRouterDeps = AuthServiceDeps & {
+  /** Enables `Idempotency-Key` support on `POST /register` when provided. */
+  idempotencyStore?: IdempotencyStore;
+  /** Enables rate limiting on `POST /login` and `POST /register` when provided, keyed by IP + route. */
+  rateLimiter?: RateLimiter;
+};
+
 /**
  * Builds the auth router: register, login, refresh, logout, password reset,
  * email verification, and `GET /me`. Password reset, email verification, and
  * OAuth linking are only active when their corresponding repo/callback deps
  * are provided; otherwise those routes respond with `NotConfiguredError`.
  */
-export function createAuthRouter(deps: AuthServiceDeps) {
+export function createAuthRouter(deps: AuthRouterDeps) {
   const router = Router();
   const service = makeAuthService(deps);
 
-  router.post('/register', async (req: Request, res: Response) => {
+  const registerMiddleware = [
+    ...(deps.rateLimiter ? [rateLimit(deps.rateLimiter, { keyFn: (req) => `register:${req.ip}` })] : []),
+    ...(deps.idempotencyStore ? [idempotent(deps.idempotencyStore)] : []),
+  ];
+  const loginMiddleware = deps.rateLimiter
+    ? [rateLimit(deps.rateLimiter, { keyFn: (req) => `login:${req.ip}` })]
+    : [];
+
+  router.post('/register', ...registerMiddleware, async (req: Request, res: Response) => {
     try {
       const data = registerSchema.parse(req.body);
-      const result = await service.registerUser(data);
+      // Self-registration is unauthenticated: only honor a client-supplied tenantId
+      // when the app has explicitly opted in, otherwise anyone could join any tenant.
+      const tenantId = deps.allowTenantIdOnRegister ? data.tenantId : undefined;
+      const result = await service.registerUser({ ...data, tenantId });
       return res.status(201).json(result);
     } catch (err) {
       return sendAppError(res, err);
     }
   });
 
-  router.post('/login', async (req: Request, res: Response) => {
+  router.post('/login', ...loginMiddleware, async (req: Request, res: Response) => {
     try {
       const data = loginSchema.parse(req.body);
       const result = await service.loginUser(data);

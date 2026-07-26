@@ -1,29 +1,41 @@
 import { Router } from 'express';
 import { isAuth, type AuthRequest } from '../../middleware/isAuth.js';
 import { hasRole, isSelfOrAdmin } from '../../middleware/hasRole.js';
+import { idempotent } from '../../middleware/idempotent.js';
 import { ForbiddenError, sendAppError } from '../../utils/errorHandler.js';
 import {
   listUsersQuerySchema,
   updateMeSchema,
   adminCreateUserSchema,
   adminUpdateUserSchema,
+  userIdsBatchSchema,
 } from './user.schemas.js';
 import { makeUserService } from './user.service.js';
 import type { UserRepo } from '../../core/ports/user.repo.js';
+import type { IdempotencyStore } from '../../core/ports/idempotency.repo.js';
+
+export type UserRouterDeps = {
+  userRepo: UserRepo;
+  /** Enables `Idempotency-Key` support on `POST /` (admin create) when provided. */
+  idempotencyStore?: IdempotencyStore;
+};
 
 /**
  * Builds the user CRUD router: admin list/create/update/delete plus
  * `GET/PUT /me` for the authenticated user. Admin routes require an
  * `ADMIN` bearer token; `/:id` routes allow the resource owner or an admin.
  */
-export function createUserRouter(deps: { userRepo: UserRepo }) {
+export function createUserRouter(deps: UserRouterDeps) {
   const router = Router();
   const service = makeUserService({ userRepo: deps.userRepo });
+  const createMiddleware = deps.idempotencyStore ? [idempotent(deps.idempotencyStore)] : [];
 
-  router.get('/', isAuth, hasRole('ADMIN'), async (req, res) => {
+  router.get('/', isAuth, hasRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       const q = listUsersQuerySchema.parse(req.query);
-      const data = await service.listUsers(q);
+      // An admin scoped to a tenant can only ever list users within that tenant.
+      const scopedQuery = req.user!.tenantId !== undefined ? { ...q, tenantId: req.user!.tenantId } : q;
+      const data = await service.listUsers(scopedQuery);
       res.json(data);
     } catch (err) {
       sendAppError(res, err);
@@ -46,7 +58,7 @@ export function createUserRouter(deps: { userRepo: UserRepo }) {
     }
   });
 
-  router.post('/', isAuth, hasRole('ADMIN'), async (req, res) => {
+  router.post('/', isAuth, hasRole('ADMIN'), ...createMiddleware, async (req, res) => {
     try {
       const body = adminCreateUserSchema.parse(req.body);
       const data = await service.adminCreateUser(body);
@@ -56,11 +68,21 @@ export function createUserRouter(deps: { userRepo: UserRepo }) {
     }
   });
 
+  router.post('/batch', isAuth, hasRole('ADMIN'), async (req: AuthRequest, res) => {
+    try {
+      const { ids } = userIdsBatchSchema.parse(req.body);
+      const data = await service.getUsersByIds(ids, req.user!.tenantId);
+      res.json({ items: data });
+    } catch (err) {
+      sendAppError(res, err);
+    }
+  });
+
   router.get('/:id', isAuth, isSelfOrAdmin(), async (req: AuthRequest, res) => {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid id' } });
 
-    const data = await service.getUserById(id);
+    const data = await service.getUserById(id, req.user!.tenantId);
     if (!data) return sendAppError(res, new Error('USER_NOT_FOUND'));
     res.json(data);
   });
@@ -69,6 +91,9 @@ export function createUserRouter(deps: { userRepo: UserRepo }) {
     try {
       const id = Number(req.params.id);
       if (Number.isNaN(id)) return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid id' } });
+
+      const existing = await service.getUserById(id, req.user!.tenantId);
+      if (!existing) return sendAppError(res, new Error('USER_NOT_FOUND'));
 
       const body = adminUpdateUserSchema.parse(req.body);
 
@@ -84,10 +109,13 @@ export function createUserRouter(deps: { userRepo: UserRepo }) {
     }
   });
 
-  router.delete('/:id', isAuth, hasRole('ADMIN'), async (req, res) => {
+  router.delete('/:id', isAuth, hasRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       const id = Number(req.params.id);
       if (Number.isNaN(id)) return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid id' } });
+
+      const existing = await service.getUserById(id, req.user!.tenantId);
+      if (!existing) return sendAppError(res, new Error('USER_NOT_FOUND'));
 
       await service.adminDeleteUser(id);
       res.status(204).end();

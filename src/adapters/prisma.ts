@@ -1,5 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { UserRepo } from '../core/ports/user.repo.js';
+import type { ApiKeyRepo } from '../core/ports/apiKey.repo.js';
+import type { IdempotencyStore } from '../core/ports/idempotency.repo.js';
 import type {
   EmailVerificationTokenRepo,
   OAuthAccountRepo,
@@ -13,9 +15,10 @@ const dateOrNow = (value?: Date) => value ?? new Date();
 /** `UserRepo` implementation backed by the bundled Prisma schema (`prisma/schema.prisma`). */
 export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
   return {
-    async count({ role, search }) {
+    async count({ role, search, tenantId }) {
       const where: Prisma.UserWhereInput = {};
       if (role) where.role = role as any;
+      if (tenantId !== undefined) where.tenantId = String(tenantId) as any;
       if (search?.trim()) {
         const s = search.trim();
         where.OR = [
@@ -26,9 +29,10 @@ export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
       return prisma.user.count({ where });
     },
 
-    async findMany({ page, pageSize, role, search, sortField, sortDir }) {
+    async findMany({ page, pageSize, role, search, tenantId, sortField, sortDir }) {
       const where: Prisma.UserWhereInput = {};
       if (role) where.role = role as any;
+      if (tenantId !== undefined) where.tenantId = String(tenantId) as any;
       if (search?.trim()) {
         const s = search.trim();
         where.OR = [
@@ -47,6 +51,7 @@ export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
           email: true,
           name: true,
           role: true,
+          tenantId: true,
           createdAt: true,
           updatedAt: true,
           profile: { select: { bio: true, avatarUrl: true } },
@@ -63,11 +68,29 @@ export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
           email: true,
           name: true,
           role: true,
+          tenantId: true,
           createdAt: true,
           updatedAt: true,
           profile: { select: { bio: true, avatarUrl: true } },
         },
       }) as any;
+    },
+
+    async findManyByIds(ids) {
+      const users = await prisma.user.findMany({
+        where: { id: { in: ids as any } },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          tenantId: true,
+          createdAt: true,
+          updatedAt: true,
+          profile: { select: { bio: true, avatarUrl: true } },
+        },
+      });
+      return users as unknown as UserListItem[];
     },
 
     async findByEmail(email) {
@@ -78,6 +101,7 @@ export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
           email: true,
           name: true,
           role: true,
+          tenantId: true,
           passwordHash: true,
           createdAt: true,
           updatedAt: true,
@@ -93,10 +117,11 @@ export function makePrismaUserRepo(prisma: PrismaClient): UserRepo {
           passwordHash: input.passwordHash,
           name: input.name ?? null,
           role: (input.role as any) ?? 'USER',
+          tenantId: input.tenantId != null ? String(input.tenantId) : null,
           profile: { create: { bio: input.bio ?? null, avatarUrl: input.avatarUrl ?? null } },
         },
         select: {
-          id: true, email: true, name: true, role: true,
+          id: true, email: true, name: true, role: true, tenantId: true,
           createdAt: true, updatedAt: true,
           profile: { select: { bio: true, avatarUrl: true } },
         },
@@ -289,6 +314,61 @@ export function makePrismaOAuthAccountRepo(prisma: PrismaClient): OAuthAccountRe
           userId: input.userId as any,
           email: input.email ?? null,
         },
+      });
+    },
+  };
+}
+
+/** `ApiKeyRepo` implementation; pass it to `isApiKey` to authenticate machine-to-machine requests. */
+export function makePrismaApiKeyRepo(prisma: PrismaClient): ApiKeyRepo {
+  return {
+    findById(id) {
+      return (prisma as any).apiKey.findUnique({ where: { id } });
+    },
+
+    create(input) {
+      return (prisma as any).apiKey.create({
+        data: {
+          id: input.id,
+          name: input.name ?? null,
+          keyHash: input.keyHash,
+          scopes: input.scopes ?? [],
+          tenantId: input.tenantId != null ? String(input.tenantId) : null,
+        },
+      });
+    },
+
+    async revoke(id, input = {}) {
+      await (prisma as any).apiKey.update({
+        where: { id },
+        data: { revokedAt: dateOrNow(input.revokedAt) },
+      });
+    },
+  };
+}
+
+/** `IdempotencyStore` implementation; pass it to the `idempotent` middleware to persist replayed responses across instances. */
+export function makePrismaIdempotencyStore(prisma: PrismaClient): IdempotencyStore {
+  return {
+    async get(key) {
+      const record = await (prisma as any).idempotencyKey.findUnique({ where: { key } });
+      if (!record) return null;
+      if (record.expiresAt && record.expiresAt.getTime() <= Date.now()) {
+        // Lazily evict on read, same as the in-memory adapter. This alone doesn't
+        // bound table growth for keys that are set once and never re-read with
+        // the same key — schedule a periodic DELETE WHERE expiresAt < now() too.
+        await (prisma as any).idempotencyKey.delete({ where: { key } }).catch(() => {});
+        return null;
+      }
+      return { status: record.status, body: record.body };
+    },
+
+    async set(key, record, ttlMs) {
+      const expiresAt = ttlMs !== undefined ? new Date(Date.now() + ttlMs) : null;
+      await (prisma as any).idempotencyKey.upsert({
+        where: { key },
+        create: { key, status: record.status, body: record.body as any, expiresAt },
+        update: { status: record.status, body: record.body as any, expiresAt },
       });
     },
   };

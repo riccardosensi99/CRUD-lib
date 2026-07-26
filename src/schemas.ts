@@ -12,4 +12,5 @@ export {
   adminUpdateUserSchema,
   listUsersQuerySchema,
   updateMeSchema,
+  userIdsBatchSchema,
 } from './modules/user/user.schemas.js';

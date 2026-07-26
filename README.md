@@ -358,11 +358,162 @@ import {
 - `mapKnownError(err)` normalizes any thrown value (a plain `Error`, a `ZodError`, or an `AppError`) into an `AppError` with a stable `code` and `statusCode`; Zod issues are formatted into `details` via `formatZodIssues`.
 - `formatZodIssues(issues)` flattens `ZodIssue[]` into `{ field, message }[]` directly, for use with your own Zod schemas outside this library's routes.
 
+## Multi-Tenancy (SaaS)
+
+An optional `tenantId` scopes users to a tenant/organization, for SaaS deployments that share one database across customers:
+
+```ts
+import { requireTenant, isSameTenant } from "my-crud-lib/middleware";
+
+// register/create accept an optional tenantId
+await service.registerUser({ email, password, tenantId: "tenant-a" });
+
+// tenantId is embedded in access/refresh tokens and available as req.user.tenantId
+app.get("/internal/reports", isAuth, requireTenant(), handler);
+```
+
+Behavior:
+- `POST /users` (admin-only) accepts an optional `tenantId`. `makeAuthService(...).registerUser()` also accepts one directly, for trusted server-side calls (e.g. your own invite-acceptance endpoint that already verified which tenant to join).
+- `POST /auth/register` is anonymous, so it **ignores** any `tenantId` in the request body by default — accepting one from an unauthenticated caller would let anyone join any tenant by guessing or copying its id. Opt in explicitly with `allowTenantIdOnRegister: true` only if your app has its own way to authorize which tenant a new registrant may join.
+- Access/refresh tokens carry `tenantId` when the user has one; `isAuth` exposes it as `req.user.tenantId`.
+- Admin `GET /users` is automatically scoped to `req.user.tenantId` when the admin's token carries one — an admin token scoped to a tenant can never list another tenant's users.
+- `GET/PUT/DELETE /users/:id` respond `404` (not `403`, to avoid leaking existence) when the target user belongs to a different tenant.
+- `requireTenant()` middleware rejects requests from tokens without a `tenantId`.
+- `isSameTenant(getResourceTenantId?)` middleware compares `req.user.tenantId` against a resolved resource tenant id (defaults to `req.params.tenantId`), for your own routes.
+
+Single-tenant apps are unaffected: omit `tenantId` everywhere and behavior is identical to before.
+
+**Security note:** any route that trusts `req.user.tenantId` to authorize access to tenant-scoped resources is only as safe as how tenant membership is granted. Prefer assigning `tenantId` from a trusted, server-side source (an invite token, an admin action) over letting it flow from unauthenticated user input.
+
+## API Keys (Machine-to-Machine Auth)
+
+For requests between internal services (workers, schedulers, other microservices) that don't have a user behind them:
+
+```ts
+import { issueApiKey, isApiKey } from "my-crud-lib";
+import { makeMemoryApiKeyRepo } from "my-crud-lib/adapters/memory"; // or makePrismaApiKeyRepo
+
+const apiKeyRepo = makeMemoryApiKeyRepo();
+
+// generate once, e.g. from an admin script; store the returned key securely — it is never retrievable again
+const { key } = await issueApiKey(apiKeyRepo, { name: "billing-service", scopes: ["users:read"] });
+
+app.get("/internal/users/:id", isApiKey(apiKeyRepo, { requiredScopes: ["users:read"] }), handler);
+```
+
+The caller sends the key back via `X-API-Key: <key>` or `Authorization: ApiKey <key>`. Only a salted hash of the key is ever persisted (via `ApiKeyRepo`); the plaintext is returned once from `issueApiKey` and cannot be recovered afterward. `isApiKey` attaches `req.apiKey = { id, name, scopes, tenantId? }` on success.
+
+To require either a user token or a service API key on the same route, chain your own small middleware that tries `isAuth` and falls back to `isApiKey`.
+
+## Asymmetric JWTs (RS256/JWKS)
+
+By default tokens are signed with `JWT_SECRET` (HS256), which every service that verifies tokens must also hold. For a microservices setup, sign with a private key in the auth service and let other services verify with the public key alone, via a standard JWKS endpoint:
+
+```bash
+JWT_ALG="RS256"
+JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+JWT_KEY_ID="2026-01"   # optional, defaults to "default"; bump when rotating keys
+```
+
+With `JWT_ALG=RS256`, `createLibrary`/`mountDefaultRoutes` automatically mount `GET /.well-known/jwks.json` (unprefixed, per convention) publishing the public key as a JWK. Other services can fetch it and verify tokens with any standard JWT/JWKS library — no shared secret required. `JWT_SECRET` is not needed in this mode.
+
+`JWT_PRIVATE_KEY`/`JWT_PUBLIC_KEY` accept PEM content directly, or with literal `\n` sequences (common when stored as a single-line CI/CD secret).
+
+## Idempotency Keys
+
+For clients that retry on timeout or fire the same intent from multiple parallel callers (common with async workers and microservice retries), `POST /auth/register` and `POST /users` can replay a stored response instead of running twice:
+
+```ts
+import { createLibrary, createServer } from "my-crud-lib";
+import { makeMemoryIdempotencyStore } from "my-crud-lib/adapters/memory"; // or makePrismaIdempotencyStore
+
+const app = createServer();
+const lib = createLibrary(
+  { routesPrefix: "/api" },
+  { userRepo, idempotencyStore: makeMemoryIdempotencyStore() }
+);
+app.use(lib.router);
+```
+
+Send `Idempotency-Key: <uuid>` on the request. The first call runs normally and its response is stored; any repeat with the same key returns the exact same response (marked with an `Idempotent-Replay: true` header) without re-executing the handler. Requests without the header are unaffected — idempotency is opt-in per call. The `idempotent(store, options?)` middleware is also exported standalone for use on your own routes.
+
+`makePrismaIdempotencyStore` evicts an expired record the next time it's read with the same key, but keys that are set once and never re-read are not cleaned up automatically — schedule a periodic `DELETE FROM "IdempotencyKey" WHERE "expiresAt" < now()` (or equivalent) if you expect high key churn.
+
+## Bulk User Lookup
+
+`POST /users/batch` resolves multiple users in a single call, for services that would otherwise fire N parallel `GET /users/:id` requests:
+
+```http
+POST /users/batch
+Authorization: Bearer <admin accessToken>
+Content-Type: application/json
+
+{ "ids": [1, 2, 3] }
+```
+
+```json
+{ "items": [ { "id": 1, "email": "...", ... }, { "id": 2, "email": "...", ... } ] }
+```
+
+Unmatched ids are silently omitted rather than causing an error. Requires an `ADMIN` token and, like `GET /users`, is automatically scoped to the admin's `tenantId` when present. Accepts up to 100 ids per call. `UserRepo.findManyByIds` is optional on custom adapters — when absent, the service falls back to N `findById` calls, so existing adapters keep working unchanged.
+
+## Rate Limiting
+
+A pluggable `RateLimiter` port protects `POST /auth/login` and `POST /auth/register` from brute-force/abuse when provided:
+
+```ts
+import { createLibrary, createServer } from "my-crud-lib";
+import { makeMemoryRateLimiter } from "my-crud-lib/adapters/memory";
+
+const app = createServer();
+const lib = createLibrary(
+  { routesPrefix: "/api" },
+  { userRepo, rateLimiter: makeMemoryRateLimiter({ points: 5, durationMs: 60_000 }) } // 5 requests/min per IP+route
+);
+app.use(lib.router);
+```
+
+Exceeding the limit responds `429` with a `Retry-After` header. `makeMemoryRateLimiter` is fixed-window and per-process only (fine for a single instance or as a default); implement the `RateLimiter` port (`consume(key, cost?)`) against Redis or another shared store to enforce one limit across multiple instances. The `rateLimit(limiter, options?)` middleware is also exported standalone for your own routes.
+
+## Correlation ID / Request Tracing
+
+`createServer()` mounts `requestId()` by default: every response carries an `X-Request-Id` header, reusing the incoming header if the caller (a gateway, another service) already sent one, or generating a UUID otherwise. Read it via `req.id` in your own routes to correlate logs, or propagate it on outbound calls to other services:
+
+```ts
+import { requestId, type RequestWithId } from "my-crud-lib/middleware";
+
+app.use(requestId({ headerName: "X-Correlation-Id" })); // custom header name, if not using createServer()
+
+app.get("/whoami", (req, res) => {
+  console.log("request", (req as RequestWithId).id);
+  res.json({ ok: true });
+});
+```
+
+To correlate a request with library-triggered side effects (e.g. [lifecycle hooks](#lifecycle-hooks)), capture `req.id` in your own route before calling into the library, and include it when logging or calling `onUserCreated`/`sendPasswordReset`/etc. from your app code.
+
+## Health Checks
+
+`createLibrary`/`mountDefaultRoutes` mount `GET /health` and `GET /ready` (unprefixed, by convention) by default — useful for orchestrator probes (Kubernetes, ECS, etc.):
+
+- `GET /health` — liveness, always `200 { "status": "ok" }`, no dependencies checked.
+- `GET /ready` — readiness, calls `userRepo.count({})`; `200 { "status": "ok" }` if it resolves, `503 { "status": "error", "error": "..." }` if it throws (e.g. the database is unreachable).
+
+Disable them with `health: false` if your app already defines these routes:
+
+```ts
+createLibrary({ health: false }, { userRepo });
+```
+
+`createHealthRouter({ userRepo })` is also exported standalone.
+
 ## Build Checks
 
 ```bash
 npm run build
 npm test
+npm run test:api
 npm run smoke:exports
 npm run smoke:auth-hardening
 npm run smoke:auth-service
@@ -371,6 +522,7 @@ npm run smoke:auth-service
 `smoke:exports` builds the package and imports the documented public paths from `dist`.
 `smoke:auth-hardening` checks auth safety defaults and JWT secret validation.
 `smoke:auth-service` verifies register/login/refresh/me with an in-memory repo.
+`test:api` runs the Jest + Supertest end-to-end API suite (`tests/api/`) against a real HTTP server backed by the in-memory adapter, covering every route mounted by `createLibrary` — success paths, validation (400), auth (401), permissions (403), not found (404), and conflicts (409). It runs automatically in CI on every pull request.
 
 ## Current Limitations
 

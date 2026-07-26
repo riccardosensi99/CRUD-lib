@@ -30,6 +30,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Run API test suite (Jest)
+        run: npm run test:api
+
       - name: Verify public exports
         run: npm run smoke:exports
 

@@ -1,4 +1,7 @@
 import type { UserRepo } from '../core/ports/user.repo.js';
+import type { ApiKeyRecord, ApiKeyRepo } from '../core/ports/apiKey.repo.js';
+import type { IdempotencyRecord, IdempotencyStore } from '../core/ports/idempotency.repo.js';
+import type { RateLimiter } from '../core/ports/rateLimiter.repo.js';
 import type { AdminUpdateUserInput, Role, UserListItem } from '../modules/user/user.types.js';
 
 type StoredUser = UserListItem & { passwordHash: string };
@@ -8,8 +11,9 @@ function toPublic(user: StoredUser): UserListItem {
   return safeUser;
 }
 
-function matchesFilters(user: StoredUser, role?: string, search?: string): boolean {
+function matchesFilters(user: StoredUser, role?: string, search?: string, tenantId?: string | number): boolean {
   if (role && user.role !== role) return false;
+  if (tenantId !== undefined && String(user.tenantId ?? '') !== String(tenantId)) return false;
   if (search?.trim()) {
     const needle = search.trim().toLowerCase();
     const haystack = `${user.email} ${user.name ?? ''}`.toLowerCase();
@@ -35,13 +39,13 @@ export function makeMemoryUserRepo(): UserRepo {
   let nextId = 1;
 
   return {
-    async count({ role, search } = {}) {
-      return [...users.values()].filter((u) => matchesFilters(u, role, search)).length;
+    async count({ role, search, tenantId } = {}) {
+      return [...users.values()].filter((u) => matchesFilters(u, role, search, tenantId)).length;
     },
 
-    async findMany({ page, pageSize, role, search, sortField, sortDir }) {
+    async findMany({ page, pageSize, role, search, tenantId, sortField, sortDir }) {
       const filtered = [...users.values()]
-        .filter((u) => matchesFilters(u, role, search))
+        .filter((u) => matchesFilters(u, role, search, tenantId))
         .sort((a, b) => compare(a, b, sortField, sortDir));
       return filtered.slice((page - 1) * pageSize, page * pageSize).map(toPublic);
     },
@@ -49,6 +53,11 @@ export function makeMemoryUserRepo(): UserRepo {
     async findById(id) {
       const user = users.get(Number(id));
       return user ? toPublic(user) : null;
+    },
+
+    async findManyByIds(ids) {
+      const wanted = new Set(ids.map((id) => Number(id)));
+      return [...users.values()].filter((u) => wanted.has(Number(u.id))).map(toPublic);
     },
 
     async findByEmail(email) {
@@ -64,6 +73,7 @@ export function makeMemoryUserRepo(): UserRepo {
         passwordHash: input.passwordHash,
         name: input.name ?? null,
         role: (input.role as Role) === 'ADMIN' ? 'ADMIN' : 'USER',
+        tenantId: input.tenantId ?? null,
         emailVerifiedAt: null,
         createdAt: now,
         updatedAt: now,
@@ -124,6 +134,90 @@ export function makeMemoryUserRepo(): UserRepo {
       const updated: StoredUser = { ...user, emailVerifiedAt: verifiedAt, updatedAt: new Date().toISOString() };
       users.set(Number(id), updated);
       return toPublic(updated);
+    },
+  };
+}
+
+/** In-memory `ApiKeyRepo` implementation. Useful for demos, prototyping, and tests. */
+export function makeMemoryApiKeyRepo(): ApiKeyRepo {
+  const keys = new Map<string, ApiKeyRecord>();
+
+  return {
+    async findById(id) {
+      return keys.get(id) ?? null;
+    },
+
+    async create(input) {
+      const record: ApiKeyRecord = {
+        id: input.id,
+        name: input.name ?? null,
+        keyHash: input.keyHash,
+        scopes: input.scopes ?? [],
+        tenantId: input.tenantId ?? null,
+        revokedAt: null,
+        createdAt: new Date().toISOString(),
+      };
+      keys.set(record.id, record);
+      return record;
+    },
+
+    async revoke(id, input = {}) {
+      const record = keys.get(id);
+      if (!record) return;
+      keys.set(id, { ...record, revokedAt: input.revokedAt ?? new Date() });
+    },
+  };
+}
+
+/** In-memory `IdempotencyStore` implementation. Useful for demos, prototyping, and tests. */
+export function makeMemoryIdempotencyStore(): IdempotencyStore {
+  const records = new Map<string, IdempotencyRecord & { expiresAt: number | null }>();
+
+  return {
+    async get(key) {
+      const record = records.get(key);
+      if (!record) return null;
+      if (record.expiresAt !== null && record.expiresAt <= Date.now()) {
+        records.delete(key);
+        return null;
+      }
+      return { status: record.status, body: record.body };
+    },
+
+    async set(key, record, ttlMs) {
+      records.set(key, {
+        ...record,
+        expiresAt: ttlMs !== undefined ? Date.now() + ttlMs : null,
+      });
+    },
+  };
+}
+
+/**
+ * In-memory fixed-window `RateLimiter`: allows up to `points` calls per `key`
+ * within each `durationMs` window. Per-process only — use a shared store
+ * (Redis, a database) to enforce one limit across multiple instances.
+ */
+export function makeMemoryRateLimiter(options: { points: number; durationMs: number }): RateLimiter {
+  const windows = new Map<string, { count: number; resetAt: number }>();
+
+  return {
+    async consume(key, cost = 1) {
+      const now = Date.now();
+      const window = windows.get(key);
+
+      if (!window || window.resetAt <= now) {
+        const resetAt = now + options.durationMs;
+        windows.set(key, { count: cost, resetAt });
+        return { allowed: cost <= options.points, remaining: Math.max(options.points - cost, 0) };
+      }
+
+      if (window.count + cost > options.points) {
+        return { allowed: false, remaining: Math.max(options.points - window.count, 0), retryAfterMs: window.resetAt - now };
+      }
+
+      window.count += cost;
+      return { allowed: true, remaining: options.points - window.count };
     },
   };
 }

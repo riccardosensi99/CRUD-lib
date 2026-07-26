@@ -20,6 +20,7 @@ export const listUsersQuerySchema = z.object({
     .transform((v) => (v === '' ? undefined : v))
     .optional(),
   role: z.enum(['USER', 'ADMIN']).optional(),
+  tenantId: z.union([z.string(), z.coerce.number()]).optional(),
   sort: SortEnum.default('createdAt:desc'),
 });
 
@@ -36,6 +37,7 @@ export const adminCreateUserSchema = z.object({
   role: z.enum(['USER', 'ADMIN']).default('USER'),
   bio: z.string().max(500).nullish(),
   avatarUrl: z.string().url().nullish(),
+  tenantId: z.union([z.string(), z.number()]).nullish(),
 });
 
 export const adminUpdateUserSchema = z.object({
@@ -45,7 +47,12 @@ export const adminUpdateUserSchema = z.object({
   avatarUrl: z.string().url().nullish(),
 });
 
+export const userIdsBatchSchema = z.object({
+  ids: z.array(z.union([z.string(), z.number()])).min(1).max(100),
+});
+
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
+export type UserIdsBatchInput = z.infer<typeof userIdsBatchSchema>;
 export type UpdateMeInput = z.infer<typeof updateMeSchema>;
 export type AdminCreateUserInput = z.infer<typeof adminCreateUserSchema>;
 export type AdminUpdateUserInput = z.infer<typeof adminUpdateUserSchema>;

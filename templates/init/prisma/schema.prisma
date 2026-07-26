@@ -13,6 +13,7 @@ model User {
   passwordHash            String
   name                    String?
   role                    Role                     @default(USER)
+  tenantId                String?
   emailVerifiedAt         DateTime?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
@@ -21,6 +22,8 @@ model User {
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
   oauthAccounts           OauthAccount[]
+
+  @@index([tenantId])
 }
 
 model Profile {
@@ -90,4 +93,24 @@ model OauthAccount {
 enum Role {
   USER
   ADMIN
+}
+
+model ApiKey {
+  id        String    @id
+  name      String?
+  keyHash   String
+  scopes    String[]  @default([])
+  tenantId  String?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+model IdempotencyKey {
+  key       String    @id
+  status    Int
+  body      Json
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
 }

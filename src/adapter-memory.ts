@@ -1,1 +1,6 @@
-export { makeMemoryUserRepo } from './adapters/memory.js';
+export {
+  makeMemoryApiKeyRepo,
+  makeMemoryIdempotencyStore,
+  makeMemoryRateLimiter,
+  makeMemoryUserRepo,
+} from './adapters/memory.js';
