@@ -4,7 +4,7 @@ All notable changes to `my-crud-lib` are documented here.
 
 This project follows semantic versioning. Breaking changes are called out explicitly and should be reviewed before upgrading.
 
-## 3.1.0 - Unreleased
+## 3.1.0 - 2026-07-26
 
 ### Added
 
