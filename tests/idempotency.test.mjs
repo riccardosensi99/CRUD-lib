@@ -72,3 +72,19 @@ test('memory idempotency store expires records after ttlMs', async () => {
   const afterExpiry = await store.get('short-lived');
   assert.equal(afterExpiry, null);
 });
+
+test('idempotent middleware responds 500 instead of hanging when the store throws', async () => {
+  const { idempotent } = await import('../dist/middleware/idempotent.js');
+
+  const brokenStore = {
+    async get() { throw new Error('STORE_DOWN'); },
+    async set() {},
+  };
+  const middleware = idempotent(brokenStore);
+
+  const res = makeRes();
+  await middleware({ headers: { 'idempotency-key': 'k1' } }, res, () => assert.fail('should not call next'));
+
+  assert.equal(res.statusCode, 500);
+  assert.equal(res.body.error.code, 'INTERNAL_ERROR');
+});

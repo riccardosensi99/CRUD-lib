@@ -62,3 +62,18 @@ test('rateLimit middleware blocks with 429 and Retry-After once the limiter deni
   assert.equal(res2.statusCode, 429);
   assert.ok(res2.headers['Retry-After']);
 });
+
+test('rateLimit middleware responds 500 instead of hanging when the limiter throws', async () => {
+  const { rateLimit } = await import('../dist/middleware/rateLimit.js');
+
+  const brokenLimiter = {
+    async consume() { throw new Error('LIMITER_DOWN'); },
+  };
+  const middleware = rateLimit(brokenLimiter);
+
+  const res = makeRes();
+  await middleware({ ip: '127.0.0.1' }, res, () => assert.fail('should not call next'));
+
+  assert.equal(res.statusCode, 500);
+  assert.equal(res.body.error.code, 'INTERNAL_ERROR');
+});

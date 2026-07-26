@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { RateLimiter } from '../core/ports/rateLimiter.repo.js';
+import { sendAppError } from '../utils/errorHandler.js';
 
 function defaultKey(req: Request): string {
   return req.ip ?? 'unknown';
@@ -10,7 +11,13 @@ export function rateLimit(limiter: RateLimiter, options?: { keyFn?: (req: Reques
   const keyFn = options?.keyFn ?? defaultKey;
 
   return async (req: Request, res: Response, next: NextFunction) => {
-    const result = await limiter.consume(keyFn(req), options?.cost);
+    let result;
+    try {
+      result = await limiter.consume(keyFn(req), options?.cost);
+    } catch (err) {
+      return sendAppError(res, err);
+    }
+
     if (!result.allowed) {
       if (result.retryAfterMs !== undefined) {
         res.setHeader('Retry-After', Math.ceil(result.retryAfterMs / 1000).toString());

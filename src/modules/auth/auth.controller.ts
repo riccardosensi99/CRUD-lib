@@ -44,7 +44,10 @@ export function createAuthRouter(deps: AuthRouterDeps) {
   router.post('/register', ...registerMiddleware, async (req: Request, res: Response) => {
     try {
       const data = registerSchema.parse(req.body);
-      const result = await service.registerUser(data);
+      // Self-registration is unauthenticated: only honor a client-supplied tenantId
+      // when the app has explicitly opted in, otherwise anyone could join any tenant.
+      const tenantId = deps.allowTenantIdOnRegister ? data.tenantId : undefined;
+      const result = await service.registerUser({ ...data, tenantId });
       return res.status(201).json(result);
     } catch (err) {
       return sendAppError(res, err);
